@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RJPQ 工具 (P2P 版)</title>
+    <!-- 引入 PeerJS 用於瀏覽器 P2P 通訊 -->
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <!-- 引入 Tesseract.js 用於純前端 OCR 辨識 -->
+    <script src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'></script>
+    <link rel="stylesheet" href="./css/style.css">
+
+    <style>
+        .ai-controls {
+            background: rgba(15, 23, 42, 0.5);
+            padding: 1rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            border: 1px solid var(--primary-glow);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .name-input {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--glass-border);
+            color: white;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            font-family: 'Outfit', sans-serif;
+            flex-grow: 1;
+            min-width: 200px;
+        }
+
+        .name-input:focus {
+            outline: none;
+            border-color: var(--primary-glow);
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.2);
+        }
+
+        .capture-btn {
+            background-color: transparent;
+            border: 1px solid #38bdf8;
+            color: #38bdf8;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .capture-btn:hover {
+            background-color: #38bdf8;
+            color: #0f172a;
+        }
+
+        .capture-btn.btn-danger {
+            border-color: #ef4444;
+            color: #ef4444;
+        }
+
+        .capture-btn.btn-danger:hover {
+            background-color: #ef4444;
+            color: white;
+        }
+
+        .status-text {
+            font-size: 0.9rem;
+            color: #94a3b8;
+            width: 100%;
+        }
+
+        .status-text.detecting {
+            color: #4ade80;
+            animation: pulse-text 1.5s infinite;
+        }
+
+        @keyframes pulse-text {
+            0% {
+                opacity: 0.7;
+            }
+
+            50% {
+                opacity: 1;
+            }
+
+            100% {
+                opacity: 0.7;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container-main">
+        <div class="header-section">
+            <div class="room-info">
+                <span class="room-label">房間代號</span>
+                <span class="room-id" id="roomCodeDisplay">------</span>
+            </div>
+            <div id="path" class="path-display">
+                ????? ?????
+            </div>
+        </div>
+
+        <!-- AI 視覺偵測控制區 (暫時隱藏) -->
+        <div class="ai-controls" style="display: none;">
+            <button id="btnCapture" class="capture-btn" onclick="startDetection()">偵測畫面輸入</button>
+            <div id="detect-status" class="status-text">偵測系統未啟動。點選左方按鈕可自動追蹤您的跳躍。</div>
+        </div>
+
+        <div class="controls">
+            <button class="color-btn btn-0" id="btn0" onclick="setSelectedColor(0)">玩家 1 (101)</button>
+            <button class="color-btn btn-1" id="btn1" onclick="setSelectedColor(1)">玩家 2 (102)</button>
+            <button class="color-btn btn-2" id="btn2" onclick="setSelectedColor(2)">玩家 3 (103)</button>
+            <button class="color-btn btn-3" id="btn3" onclick="setSelectedColor(3)">玩家 4 (104)</button>
+            <button class="reset-btn" onclick="requestReset()">重設全部</button>
+        </div>
+
+        <div id="platforms" class="grid-container">
+            <!-- 平台將由 JavaScript 自動生成 -->
+        </div>
+    </div>
+
+    <!-- 底部狀態欄 -->
+    <div id="status-indicator">
+        <div class="status-dot" id="status-dot"></div>
+        <span id="status-text">正在初始化 P2P 服務...</span>
+        <span id="peer-count" style="margin-left: 8px; font-weight: bold; color: #38bdf8;"></span>
+    </div>
+
+    <!-- 隱藏的 DOM，用於接收並處理螢幕畫面 -->
+    <video id="screenVideo" autoplay hidden></video>
+    <canvas id="screenCanvas" hidden></canvas>
+
+    <!-- 依序載入模組 -->
+    <script src="js/p2p.js" defer></script>
+    <script src="js/ui.js" defer></script>
+    <script src="js/detector.js" defer></script>
+    <script src="js/main.js" defer></script>
+</body>
+
+</html>
