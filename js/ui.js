@@ -1,35 +1,35 @@
 function renderPlatforms() {
     const container = document.getElementById("platforms");
-    if(!container) return;
+    if (!container) return;
     container.innerHTML = "";
-    
+
     for (let row = 0; row < 10; row++) {
         const rowNum = 10 - row;
         const rowDiv = document.createElement("div");
         rowDiv.className = "row-group";
-        
+
         const label = document.createElement("div");
         label.className = "row-label";
         label.innerText = rowNum;
         rowDiv.appendChild(label);
-        
+
         const wrapper = document.createElement("div");
         wrapper.className = "platforms-wrapper";
-        
+
         for (let col = 0; col < 4; col++) {
             const colNum = col + 1;
             const index = row * 4 + col;
             const val = roomData[index];
-            
+
             const cell = document.createElement("div");
             cell.className = `platform-cell ${val < 4 ? 'active-' + val : ''}`;
             cell.innerText = colNum;
             cell.dataset.index = index;
             cell.onclick = (e) => onPlatformClick(index);
-            
+
             wrapper.appendChild(cell);
         }
-        
+
         rowDiv.appendChild(wrapper);
         container.appendChild(rowDiv);
     }
@@ -47,26 +47,26 @@ function renderPath() {
     }
     let displayPath = [...path].reverse();
     displayPath.splice(5, 0, " ");
-    
+
     const pathEl = document.getElementById("path");
-    if(pathEl) pathEl.innerText = displayPath.join("");
+    if (pathEl) pathEl.innerText = displayPath.join("");
 }
 
 function setSelectedColor(idx) {
     selectedColor = idx;
     document.querySelectorAll('.color-btn').forEach(btn => btn.classList.remove('active'));
-    
+
     const targetBtn = document.getElementById('btn' + idx);
-    if(targetBtn) targetBtn.classList.add('active');
-    
-    renderPath(); 
+    if (targetBtn) targetBtn.classList.add('active');
+
+    renderPath();
 }
 
 // 供 detector 自動化的點選邏輯 (不重新賦值 selectedColor 但傳入指定顏色)
 // 這邊將原有的 onPlatformClick 拆分，以便程式調用不會被 selectedColor 卡住
 function simulatePlatformClick(index, forceColor) {
     let colorToUse = forceColor !== undefined ? forceColor : selectedColor;
-    
+
     if (colorToUse === -1) {
         alert("請先選擇一個玩家位置");
         return;
@@ -115,13 +115,13 @@ function synchronizeColRules(index, color) {
 function updateStatus(state, text) {
     const dot = document.getElementById('status-dot');
     const txt = document.getElementById('status-text');
-    if(dot) dot.className = "status-dot " + state;
-    if(txt) txt.innerText = text;
+    if (dot) dot.className = "status-dot " + state;
+    if (txt) txt.innerText = text;
 }
 
 function updatePeerCount() {
     const count = document.getElementById('peer-count');
-    if(!count) return;
+    if (!count) return;
     if (isHost && connections.length > 0) {
         const pCount = connections.filter(c => !(c.metadata && c.metadata.isObserver)).length + 1;
         const obsCount = connections.filter(c => c.metadata && c.metadata.isObserver).length;
@@ -138,6 +138,8 @@ let shortcutBuffer = [];
 let shortcutTimer = null;
 
 document.addEventListener('keydown', (e) => {
+    if (typeof isObserver !== 'undefined' && isObserver) return;
+
     // 若正在輸入文字，忽略快速鍵
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
@@ -147,57 +149,55 @@ document.addEventListener('keydown', (e) => {
         }
         return;
     }
-    
+
     if (e.key.toLowerCase() === 'r') {
         if (typeof requestReset === 'function') requestReset();
         return;
     }
 
-    if (typeof isObserver !== 'undefined' && isObserver) return;
-    
     // 只在按下數字鍵時處理 (支援大鍵盤與小鍵盤數字)
     const isDigit = /^[0-9]$/.test(e.key);
-    
+
     if (isDigit) {
         // 避免一些預設功能 (只有在需要使用數字當快捷的情境)
         // e.preventDefault(); 
-        
+
         const digit = parseInt(e.key);
         shortcutBuffer.push(digit);
-        
+
         // 清除舊的計時器
         if (shortcutTimer) clearTimeout(shortcutTimer);
-        
+
         if (shortcutBuffer.length === 1) {
             // 第一位數：層數 (1-9 為第 1-9 層, 0 為第 10 層)
             console.log(`快捷鍵輸入中: 層數 = ${digit === 0 ? 10 : digit}, 請輸入平台編號 (1-4)...`);
-            
+
             // 2 秒內沒輸入第二位則失效
             shortcutTimer = setTimeout(() => {
                 shortcutBuffer = [];
                 console.log("快捷鍵輸入超時");
             }, 2000);
-        } 
+        }
         else if (shortcutBuffer.length === 2) {
             // 第二位數：平台 (1-4)
             const rowDigit = shortcutBuffer[0];
             const colDigit = shortcutBuffer[1];
-            
+
             // 計算實際索引
             // rowDigit: 1->row=9 (第1層), 0->row=0 (第10層), 2->row=8 (第2層)...
             const rowIndex = (rowDigit === 0) ? 0 : (10 - rowDigit);
             const colIndex = colDigit - 1;
-            
+
             if (colDigit >= 1 && colDigit <= 4 && rowIndex >= 0 && rowIndex <= 9) {
                 const targetIndex = rowIndex * 4 + colIndex;
                 console.log(`快速鍵觸發: 第 ${rowDigit === 0 ? 10 : rowDigit} 層, 第 ${colDigit} 平台 (索引: ${targetIndex})`);
-                
+
                 // 執行點選行為 (使用目前選定的顏色)
                 simulatePlatformClick(targetIndex);
             } else {
                 console.log("快捷鍵無效: 平台編號需在 1-4 之間");
             }
-            
+
             // 重設
             shortcutBuffer = [];
         }
@@ -321,7 +321,7 @@ function openStatusWindow() {
 
 // 修改 renderPlatforms 最後一行以同步彈出視窗
 const originalRenderPlatforms = renderPlatforms;
-renderPlatforms = function() {
+renderPlatforms = function () {
     originalRenderPlatforms();
     if (statusWindow && !statusWindow.closed) {
         statusWindow.postMessage({ type: "UPDATE", roomData: roomData }, "*");

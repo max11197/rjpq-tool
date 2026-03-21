@@ -33,6 +33,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 controls.innerHTML = `<button class="capture-btn" onclick="openStatusWindow()" title="開啟置頂小視窗">開啟即時燈號窗</button>`;
             }
             document.querySelectorAll('.ai-controls').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.instruction-section').forEach(el => el.style.display = 'none');
         }
 
         // 啟動 P2P 與渲染

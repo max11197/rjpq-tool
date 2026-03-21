@@ -44,7 +44,7 @@ function setStatus(msg) {
    ========================================================= */
 let isDraggingRoi = false;
 let dragType = ''; // 'move', 'tl', 'tc', 'tr', 'ml', 'mr', 'bl', 'bc', 'br'
-let dragStartX = 0; 
+let dragStartX = 0;
 let dragStartY = 0;
 let initialRoi = null;
 
@@ -55,7 +55,7 @@ function setupRoiInteractive() {
 
     if (!box._hasDragEvent) {
         box._hasDragEvent = true;
-        
+
         box.addEventListener('mousedown', (e) => {
             if (e.target.classList.contains('resize-handle')) {
                 dragType = e.target.getAttribute('data-resize');
@@ -71,11 +71,11 @@ function setupRoiInteractive() {
 
         window.addEventListener('mousemove', (e) => {
             if (!isDraggingRoi) return;
-            
+
             const rect = container.getBoundingClientRect();
             const dx = (e.clientX - dragStartX) / rect.width;
             const dy = (e.clientY - dragStartY) / rect.height;
-            
+
             let newRoi = { ...initialRoi };
 
             if (dragType === 'move') {
@@ -110,21 +110,21 @@ function setupRoiInteractive() {
 
 function updateRoiPreview() {
     const box = document.getElementById("roi-box-interactive");
-    if(box) {
+    if (box) {
         box.style.left = `${roiConfig.x * 100}%`;
         box.style.top = `${roiConfig.y * 100}%`;
         box.style.width = `${roiConfig.w * 100}%`;
         box.style.height = `${roiConfig.h * 100}%`;
     }
-    
+
     const valX = document.getElementById("val-x");
-    if(valX) valX.innerText = Math.round(roiConfig.x * 100);
+    if (valX) valX.innerText = Math.round(roiConfig.x * 100);
     const valY = document.getElementById("val-y");
-    if(valY) valY.innerText = Math.round(roiConfig.y * 100);
+    if (valY) valY.innerText = Math.round(roiConfig.y * 100);
     const valW = document.getElementById("val-w");
-    if(valW) valW.innerText = Math.round(roiConfig.w * 100);
+    if (valW) valW.innerText = Math.round(roiConfig.w * 100);
     const valH = document.getElementById("val-h");
-    if(valH) valH.innerText = Math.round(roiConfig.h * 100);
+    if (valH) valH.innerText = Math.round(roiConfig.h * 100);
 }
 
 /* =========================================================
@@ -136,18 +136,18 @@ const PRESET_ROIS = {
     "1680x1050": { x: 0.0, y: 0.80, w: 0.40, h: 0.20 },
     "1600x1200": { x: 0.0, y: 0.80, w: 0.45, h: 0.20 },
     "1600x1024": { x: 0.0, y: 0.80, w: 0.40, h: 0.20 },
-    "1600x900":  { x: 0.0, y: 0.80, w: 0.40, h: 0.20 },
+    "1600x900": { x: 0.0, y: 0.80, w: 0.40, h: 0.20 },
     "1440x1080": { x: 0.0, y: 0.80, w: 0.45, h: 0.20 },
-    "1440x900":  { x: 0.0, y: 0.80, w: 0.40, h: 0.20 },
-    "1366x768":  { x: 0.0, y: 0.80, w: 0.40, h: 0.20 },
-    "1360x768":  { x: 0.0, y: 0.80, w: 0.40, h: 0.20 },
+    "1440x900": { x: 0.0, y: 0.80, w: 0.40, h: 0.20 },
+    "1366x768": { x: 0.0, y: 0.80, w: 0.40, h: 0.20 },
+    "1360x768": { x: 0.0, y: 0.80, w: 0.40, h: 0.20 },
     "1280x1024": { x: 0.0, y: 0.75, w: 0.50, h: 0.25 },
-    "1280x960":  { x: 0.0, y: 0.75, w: 0.50, h: 0.25 },
-    "1280x800":  { x: 0.0, y: 0.80, w: 0.45, h: 0.20 },
-    "1280x768":  { x: 0.0, y: 0.80, w: 0.45, h: 0.20 },
-    "1280x720":  { x: 0.0, y: 0.80, w: 0.45, h: 0.20 },
-    "1024x768":  { x: 0.0, y: 0.80, w: 0.50, h: 0.20 },
-    "800x600":   { x: 0.0, y: 0.75, w: 0.60, h: 0.25 }
+    "1280x960": { x: 0.0, y: 0.75, w: 0.50, h: 0.25 },
+    "1280x800": { x: 0.0, y: 0.80, w: 0.45, h: 0.20 },
+    "1280x768": { x: 0.0, y: 0.80, w: 0.45, h: 0.20 },
+    "1280x720": { x: 0.0, y: 0.80, w: 0.45, h: 0.20 },
+    "1024x768": { x: 0.0, y: 0.80, w: 0.50, h: 0.20 },
+    "800x600": { x: 0.0, y: 0.75, w: 0.60, h: 0.25 }
 };
 
 async function startDetectionParams(isManual = false) {
@@ -182,15 +182,15 @@ async function startDetectionParams(isManual = false) {
             videoElement = document.getElementById("previewVideo");
             videoElement.srcObject = stream;
             await videoElement.play();
-            
+
             stream.getVideoTracks()[0].onended = () => stopDetectionParams();
 
             document.getElementById("ai-controls-main").style.display = "none";
             document.getElementById("roi-setup").style.display = "flex";
-            
+
             setupRoiInteractive();
             updateRoiPreview();
-            
+
             btn.disabled = false;
             btn.innerText = originalText;
             setStatus("請拖曳設定框區。");
@@ -217,7 +217,7 @@ async function startDetectionParams(isManual = false) {
 function confirmRoiAndStart(isAuto = false) {
     document.getElementById("roi-setup").style.display = "none";
     document.getElementById("ai-controls-main").style.display = "flex";
-    
+
     // 如果是手動設定完成，需要把 video 切換給 screenVideo，避免重複開授權
     if (!isAuto) {
         const preview = document.getElementById("previewVideo");
@@ -234,17 +234,17 @@ function confirmRoiAndStart(isAuto = false) {
     isDetecting = true;
     isPaused = false;
     lastDetectedStr = ""; // 重設緩存
-    
+
     const btn = document.getElementById("btnCapture");
     btn.innerText = "停止偵測";
     btn.classList.add("btn-danger");
     btn.onclick = stopDetectionParams;
-    
+
     const btnM = document.getElementById("btnManualRoi");
     btnM.style.display = "none"; // 偵測時隱藏手動按鈕
 
     const btnP = document.getElementById("btnPause");
-    if(btnP) {
+    if (btnP) {
         btnP.style.display = "inline-block";
         btnP.innerText = "暫停(P)";
     }
@@ -259,7 +259,7 @@ function confirmRoiAndStart(isAuto = false) {
 
 function stopDetectionParams() {
     isDetecting = false;
-    
+
     document.getElementById("roi-setup").style.display = "none";
     document.getElementById("ai-controls-main").style.display = "flex";
 
@@ -267,10 +267,10 @@ function stopDetectionParams() {
         clearTimeout(detectionTimeout);
         detectionTimeout = null;
     }
-    
+
     // 停止所有的視訊串流
     const streams = [
-        document.getElementById("previewVideo"), 
+        document.getElementById("previewVideo"),
         document.getElementById("screenVideo")
     ];
     streams.forEach(vid => {
@@ -282,17 +282,17 @@ function stopDetectionParams() {
     videoElement = null;
 
     const btn = document.getElementById("btnCapture");
-    if(btn) {
+    if (btn) {
         btn.innerText = "自動偵測";
         btn.classList.remove("btn-danger");
         btn.onclick = () => startDetectionParams(false);
     }
-    
+
     const btnM = document.getElementById("btnManualRoi");
     if (btnM) btnM.style.display = "inline-block";
-    
+
     const btnP = document.getElementById("btnPause");
-    if(btnP) btnP.style.display = "none";
+    if (btnP) btnP.style.display = "none";
 
     const statusEl = document.getElementById("detect-status");
     if (statusEl) statusEl.className = "status-text";
@@ -306,7 +306,7 @@ async function startAnalysisLoop() {
         // 設定 Canvas 符合 ROI 的解析度，增強辨識
         const vw = videoElement.videoWidth;
         const vh = videoElement.videoHeight;
-        
+
         const cropX = Math.floor(vw * roiConfig.x);
         const cropY = Math.floor(vh * roiConfig.y);
         const cropW = Math.max(1, Math.floor(vw * roiConfig.w));
@@ -316,10 +316,10 @@ async function startAnalysisLoop() {
         canvasElement.width = cropW * 2;
         canvasElement.height = cropH * 2;
         ctx = canvasElement.getContext("2d", { willReadFrequently: true });
-        
+
         // 將畫面部分畫進 Canvas，黑底白字高反差
         ctx.filter = "invert(1) contrast(2) brightness(1.2)";
-        ctx.drawImage(videoElement, 
+        ctx.drawImage(videoElement,
             cropX, cropY, cropW, cropH,
             0, 0, canvasElement.width, canvasElement.height
         );
@@ -343,7 +343,7 @@ function processOcrText(text) {
 
     // 依行切割
     const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-    
+
     const chkFilter = document.getElementById('chkFilterPlayer');
     const playerNameEl = document.getElementById('playerNameInput');
     const isNameFilterEnabled = (chkFilter && chkFilter.checked && playerNameEl && playerNameEl.value.trim() !== '');
@@ -352,7 +352,7 @@ function processOcrText(text) {
     // 從最後一行往前算
     for (let i = lines.length - 1; i >= 0; i--) {
         let line = lines[i];
-        
+
         if (isNameFilterEnabled) {
             // 由於 OCR 可能對字元辨識有些微誤差，這裡我們做相對精確的名稱偵測
             const nameIdx = line.indexOf(filterName);
@@ -381,7 +381,7 @@ function processOcrText(text) {
         if (matches) {
             for (let j = matches.length - 1; j >= 0; j--) {
                 const s = matches[j].replace(/\s+/g, '');
-                
+
                 // 長度只能 1~10，且要跟前一次不同
                 if (s.length >= 1 && s.length <= 10) {
                     if (s !== lastDetectedStr) {
@@ -419,7 +419,7 @@ function applyPathToRoom(playerColor, pathStr) {
         const col = parseInt(pathStr[layer], 10) - 1; // '1' 變 0
         const row = 9 - layer;
         const index = row * 4 + col;
-        
+
         // 只有這格目前是空的，才填寫，遇到別人的位置則不覆蓋
         if (roomData[index] === 4) {
             roomData[index] = playerColor;
@@ -429,7 +429,7 @@ function applyPathToRoom(playerColor, pathStr) {
 
     if (changed) {
         if (typeof renderPlatforms === 'function') renderPlatforms();
-        
+
         const payload = { type: 'FULL_SYNC', data: roomData };
         if (isHost && typeof broadcast === 'function') {
             broadcast(payload);

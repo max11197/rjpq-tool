@@ -5,17 +5,22 @@
     --card-bg: rgba(30, 41, 59, 0.7);
     --primary-glow: rgba(56, 189, 248, 0.5);
     --glass-border: rgba(255, 255, 255, 0.1);
-    
-    --color-0: #f87171; /* Red */
-    --color-1: #4ade80; /* Green */
-    --color-2: #60a5fa; /* Blue */
-    --color-3: #c084fc; /* Purple */
-    --color-4: #334155; /* Gray/Inactive */
+
+    --color-0: #f87171;
+    /* Red */
+    --color-1: #4ade80;
+    /* Green */
+    --color-2: #60a5fa;
+    /* Blue */
+    --color-3: #c084fc;
+    /* Purple */
+    --color-4: #334155;
+    /* Gray/Inactive */
 }
 
 body {
     background-color: var(--bg-color);
-    background-image: 
+    background-image:
         radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.15) 0px, transparent 50%),
         radial-gradient(at 100% 100%, rgba(192, 132, 252, 0.15) 0px, transparent 50%);
     color: #f1f5f9;
@@ -120,10 +125,21 @@ body {
     border: 2px solid white;
 }
 
-.btn-0 { background-color: var(--color-0); }
-.btn-1 { background-color: var(--color-1); }
-.btn-2 { background-color: var(--color-2); }
-.btn-3 { background-color: var(--color-3); }
+.btn-0 {
+    background-color: var(--color-0);
+}
+
+.btn-1 {
+    background-color: var(--color-1);
+}
+
+.btn-2 {
+    background-color: var(--color-2);
+}
+
+.btn-3 {
+    background-color: var(--color-3);
+}
 
 .reset-btn {
     background-color: transparent;
@@ -188,10 +204,29 @@ body {
     transform: scale(1.02);
 }
 
-.platform-cell.active-0 { background-color: var(--color-0); color: white; box-shadow: 0 0 12px var(--color-0); }
-.platform-cell.active-1 { background-color: var(--color-1); color: white; box-shadow: 0 0 12px var(--color-1); }
-.platform-cell.active-2 { background-color: var(--color-2); color: white; box-shadow: 0 0 12px var(--color-2); }
-.platform-cell.active-3 { background-color: var(--color-3); color: white; box-shadow: 0 0 12px var(--color-3); }
+.platform-cell.active-0 {
+    background-color: var(--color-0);
+    color: white;
+    box-shadow: 0 0 12px var(--color-0);
+}
+
+.platform-cell.active-1 {
+    background-color: var(--color-1);
+    color: white;
+    box-shadow: 0 0 12px var(--color-1);
+}
+
+.platform-cell.active-2 {
+    background-color: var(--color-2);
+    color: white;
+    box-shadow: 0 0 12px var(--color-2);
+}
+
+.platform-cell.active-3 {
+    background-color: var(--color-3);
+    color: white;
+    box-shadow: 0 0 12px var(--color-3);
+}
 
 /* Status Toast */
 #status-indicator {
@@ -216,13 +251,28 @@ body {
     background: #94a3b8;
 }
 
-.status-dot.online { background: #10b981; box-shadow: 0 0 8px #10b981; }
-.status-dot.connecting { background: #f59e0b; animation: pulse 1s infinite; }
+.status-dot.online {
+    background: #10b981;
+    box-shadow: 0 0 8px #10b981;
+}
+
+.status-dot.connecting {
+    background: #f59e0b;
+    animation: pulse 1s infinite;
+}
 
 @keyframes pulse {
-    0% { opacity: 1; }
-    50% { opacity: 0.5; }
-    100% { opacity: 1; }
+    0% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+
+    100% {
+        opacity: 1;
+    }
 }
 
 /* --- 房間入口介面樣式 --- */
@@ -238,7 +288,6 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 20px;
 }
 
 .setup-card {
@@ -254,8 +303,15 @@ body {
 }
 
 @keyframes slideUp {
-    from { opacity: 0; transform: translateY(40px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(40px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .setup-title {
@@ -394,10 +450,12 @@ body {
         align-items: center;
         text-align: center;
     }
+
     .container-main {
         padding: 1rem;
         margin-bottom: 20px;
     }
+
     #status-indicator {
         position: relative;
         bottom: auto;
