@@ -103,7 +103,8 @@
 
             <div class="input-group">
                 <input type="text" id="roomInput" placeholder="輸入房間代碼 (例如: 1234)" maxlength="20">
-                <label style="color: #94a3b8; font-size: 0.9rem; margin-top: 15px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;">
+                <label
+                    style="color: #94a3b8; font-size: 0.9rem; margin-top: 15px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;">
                     <input type="checkbox" id="chkObserver">
                     以觀察模式加入 (只看、不佔人數)
                 </label>
@@ -130,49 +131,76 @@
             </div>
         </div>
 
-        <!-- AI 視覺偵測控制區 (預設顯示) -->
         <div class="ai-controls" id="ai-controls-main" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
             <select id="resSelect" class="name-input" style="min-width: 150px; background: rgba(0,0,0,0.5); border-radius: 8px;">
-                <option value="800x600">800x600 解析度</option>
-                <option value="1024x768">1024x768 解析度</option>
-                <option value="1280x720">1280x720 解析度</option>
-                <option value="1366x768" selected>1366x768 解析度</option>
-                <option value="1920x1080">1920x1080 解析度</option>
                 <option value="2560x1440">2560x1440 解析度</option>
+                <option value="1920x1080">1920x1080 解析度</option>
+                <option value="1680x1050">1680x1050 解析度</option>
+                <option value="1600x1200">1600x1200 解析度</option>
+                <option value="1600x1024">1600x1024 解析度</option>
+                <option value="1600x900">1600x900 解析度</option>
+                <option value="1440x1080">1440x1080 解析度</option>
+                <option value="1440x900">1440x900 解析度</option>
+                <option value="1366x768" selected>1366x768 解析度</option>
+                <option value="1360x768">1360x768 解析度</option>
+                <option value="1280x1024">1280x1024 解析度</option>
+                <option value="1280x960">1280x960 解析度</option>
+                <option value="1280x800">1280x800 解析度</option>
+                <option value="1280x768">1280x768 解析度</option>
+                <option value="1280x720">1280x720 解析度</option>
+                <option value="1024x768">1024x768 解析度</option>
+                <option value="800x600">800x600 解析度</option>
             </select>
-            <button id="btnCapture" class="capture-btn" onclick="startDetectionParams()">直接開始偵測</button>
-            <button id="btnPause" class="capture-btn" style="display: none; border-color: #f59e0b; color: #f59e0b;" onclick="togglePauseDetection()">暫停輸入</button>
+            <button id="btnCapture" class="capture-btn" onclick="startDetectionParams()">自動偵測</button>
+            <button id="btnManualRoi" class="capture-btn" onclick="startDetectionParams(true)">手動選取</button>
+            <button id="btnPause" class="capture-btn" style="display: none; border-color: #f59e0b; color: #f59e0b;"
+                onclick="togglePauseDetection()">暫停(P)</button>
+            
+            <label style="color: #94a3b8; font-size: 0.9rem; display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                <input type="checkbox" id="chkFilterPlayer" onchange="document.getElementById('playerNameInput').style.display = this.checked ? 'inline-block' : 'none'">
+                僅偵測該玩家對話
+            </label>
+            <input type="text" id="playerNameInput" class="name-input" placeholder="輸入遊戲暱稱" style="display: none; width: 120px; font-size: 0.9rem; padding: 0.4rem;">
+            
+            <div style="display: flex; align-items: center; gap: 5px; color: #94a3b8; font-size: 0.9rem; margin-left: 10px;">
+                偵測頻率: 
+                <input type="range" id="intervalRange" min="50" max="2000" step="10" value="150" style="width: 80px;" oninput="document.getElementById('intervalInput').value = this.value">
+                <input type="number" id="intervalInput" value="150" style="width: 50px; background: rgba(0,0,0,0.5); border: 1px solid var(--glass-border); color: white; border-radius: 4px; padding: 2px 4px; text-align: center;" oninput="document.getElementById('intervalRange').value = this.value"> ms
+            </div>
+
             <div id="detect-status" class="status-text">點選左方按鈕啟動對話輸入辨識。預設抓取特定比例的左下角。</div>
         </div>
 
-        <!-- 
-        ［舊版的自訂 ROI 設定區］已註解保留，供未來備用
+        <!-- 手動 ROI 設定區 -->
         <div id="roi-setup" class="ai-controls" style="display: none; flex-direction: column; align-items: stretch;">
-            <div style="color: #38bdf8; font-weight: bold; margin-bottom: 15px;">請調整下方滑桿，將紅框對準遊戲的「聊天輸入框」</div>
+            <div style="color: #38bdf8; font-weight: bold; margin-bottom: 15px;">請拖曳紅框與白點調整偵測區域，涵蓋「聊天輸入框」與「頻道發言」</div>
             <div style="display: flex; gap: 20px; flex-wrap: wrap;">
-                <div style="flex: 1; position: relative; min-width: 300px;">
-                    <video id="previewVideo" autoplay muted style="width: 100%; border: 1px solid #334155; border-radius: 4px;"></video>
-                    <div id="roi-box" style="position: absolute; border: 2px solid #ef4444; background: rgba(239, 68, 68, 0.3); pointer-events: none; left: 0%; top: 70%; width: 40%; height: 15%;"></div>
+                <div style="flex: 1; position: relative; min-width: 300px; user-select: none;">
+                    <video id="previewVideo" autoplay muted style="width: 100%; display: block; border: 1px solid #334155; border-radius: 4px; pointer-events: none;"></video>
+                    <!-- 滑鼠拖曳容器 -->
+                    <div id="roi-box-interactive" style="position: absolute; border: 2px solid #ef4444; background: rgba(239, 68, 68, 0.2); left: 0%; top: 70%; width: 40%; height: 15%; cursor: move; touch-action: none;">
+                        <div class="resize-handle top-left" data-resize="tl" style="position: absolute; width: 12px; height: 12px; background: white; border: 1px solid #111; left: -6px; top: -6px; cursor: nwse-resize;"></div>
+                        <div class="resize-handle top-center" data-resize="tc" style="position: absolute; width: 12px; height: 12px; background: white; border: 1px solid #111; left: calc(50% - 6px); top: -6px; cursor: ns-resize;"></div>
+                        <div class="resize-handle top-right" data-resize="tr" style="position: absolute; width: 12px; height: 12px; background: white; border: 1px solid #111; right: -6px; top: -6px; cursor: nesw-resize;"></div>
+                        <div class="resize-handle middle-left" data-resize="ml" style="position: absolute; width: 12px; height: 12px; background: white; border: 1px solid #111; left: -6px; top: calc(50% - 6px); cursor: ew-resize;"></div>
+                        <div class="resize-handle middle-right" data-resize="mr" style="position: absolute; width: 12px; height: 12px; background: white; border: 1px solid #111; right: -6px; top: calc(50% - 6px); cursor: ew-resize;"></div>
+                        <div class="resize-handle bottom-left" data-resize="bl" style="position: absolute; width: 12px; height: 12px; background: white; border: 1px solid #111; left: -6px; bottom: -6px; cursor: nesw-resize;"></div>
+                        <div class="resize-handle bottom-center" data-resize="bc" style="position: absolute; width: 12px; height: 12px; background: white; border: 1px solid #111; left: calc(50% - 6px); bottom: -6px; cursor: ns-resize;"></div>
+                        <div class="resize-handle bottom-right" data-resize="br" style="position: absolute; width: 12px; height: 12px; background: white; border: 1px solid #111; right: -6px; bottom: -6px; cursor: nwse-resize;"></div>
+                    </div>
                 </div>
                 <div style="width: 200px; display: flex; flex-direction: column; gap: 15px; font-size: 0.9rem; color: #cbd5e1;">
-                    <label style="display: flex; flex-direction: column;">X 偏移: <span id="val-x">0%</span>
-                        <input type="range" id="roi-x" min="0" max="100" value="0" oninput="updateRoiBox()">
-                    </label>
-                    <label style="display: flex; flex-direction: column;">Y 偏移: <span id="val-y">70%</span>
-                        <input type="range" id="roi-y" min="0" max="100" value="70" oninput="updateRoiBox()">
-                    </label>
-                    <label style="display: flex; flex-direction: column;">寬度: <span id="val-w">40%</span>
-                        <input type="range" id="roi-w" min="5" max="100" value="40" oninput="updateRoiBox()">
-                    </label>
-                    <label style="display: flex; flex-direction: column;">高度: <span id="val-h">15%</span>
-                        <input type="range" id="roi-h" min="5" max="100" value="15" oninput="updateRoiBox()">
-                    </label>
+                    <div style="font-weight: bold; color: white;">設定參數：</div>
+                    <div>X 偏移: <span id="val-x">0</span>%</div>
+                    <div>Y 偏移: <span id="val-y">70</span>%</div>
+                    <div>寬度: <span id="val-w">40</span>%</div>
+                    <div>高度: <span id="val-h">15</span>%</div>
+                    
                     <button class="capture-btn" onclick="confirmRoiAndStart()" style="margin-top: auto; border-color: #4ade80; color: #4ade80;">確定並開始</button>
-                    <button class="capture-btn btn-danger" onclick="stopDetection()">取消/停止</button>
+                    <button class="capture-btn btn-danger" onclick="stopDetectionParams()">取消/停止</button>
                 </div>
             </div>
         </div>
-        -->
 
         <div class="controls">
             <button class="color-btn btn-0" id="btn0" onclick="setSelectedColor(0)">玩家 1 (101)</button>
@@ -191,8 +219,16 @@
             <h3 class="instruction-title">⌨️ 快速操作說明</h3>
             <div class="instruction-grid">
                 <div class="instruction-item">
-                    <span class="key">Ctrl</span> + <span class="key">0-9</span> + <span class="key">1-4</span>
+                    <span class="key">0-9</span> 後接 <span class="key">1-4</span>
                     <p>網頁聚焦時，快速點亮特定層數與平台 (0 為第 10 層)</p>
+                </div>
+                <div class="instruction-item">
+                    <span class="key">P</span>
+                    <p>偵測中時暫停 / 恢復自動掃描</p>
+                </div>
+                <div class="instruction-item">
+                    <span class="key">R</span>
+                    <p>觸發重設確認並清空所有位置</p>
                 </div>
             </div>
             <div class="instruction-note" style="font-size: 0.8rem; color: #64748b; margin-top: 10px;">

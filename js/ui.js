@@ -138,13 +138,29 @@ let shortcutBuffer = [];
 let shortcutTimer = null;
 
 document.addEventListener('keydown', (e) => {
+    // 若正在輸入文字，忽略快速鍵
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+    if (e.key.toLowerCase() === 'p') {
+        if (typeof isDetecting !== 'undefined' && isDetecting) {
+            if (typeof togglePauseDetection === 'function') togglePauseDetection();
+        }
+        return;
+    }
+    
+    if (e.key.toLowerCase() === 'r') {
+        if (typeof requestReset === 'function') requestReset();
+        return;
+    }
+
     if (typeof isObserver !== 'undefined' && isObserver) return;
     
-    // 只在按下 Ctrl 且為數字鍵時處理 (支援大鍵盤與小鍵盤數字)
+    // 只在按下數字鍵時處理 (支援大鍵盤與小鍵盤數字)
     const isDigit = /^[0-9]$/.test(e.key);
     
-    if (e.ctrlKey && isDigit) {
-        e.preventDefault(); // 避免瀏覽器切換標籤頁 (Ctrl+1~Ctrl+9)
+    if (isDigit) {
+        // 避免一些預設功能 (只有在需要使用數字當快捷的情境)
+        // e.preventDefault(); 
         
         const digit = parseInt(e.key);
         shortcutBuffer.push(digit);
@@ -258,8 +274,18 @@ function openStatusWindow() {
                 let sb = [];
                 let st = null;
                 window.addEventListener("keydown", (e) => {
-                    if (e.ctrlKey && e.key >= "0" && e.key <= "9") {
-                        e.preventDefault();
+                    if (e.key.toLowerCase() === "p" && window.opener && !window.opener.closed) {
+                        if (typeof window.opener.isDetecting !== "undefined" && window.opener.isDetecting) {
+                            if (typeof window.opener.togglePauseDetection === "function") window.opener.togglePauseDetection();
+                        }
+                        return;
+                    }
+                    if (e.key.toLowerCase() === "r" && window.opener && !window.opener.closed) {
+                        if (typeof window.opener.requestReset === "function") window.opener.requestReset();
+                        return;
+                    }
+                
+                    if (e.key >= "0" && e.key <= "9") {
                         const digit = parseInt(e.key);
                         sb.push(digit);
                         if (st) clearTimeout(st);
