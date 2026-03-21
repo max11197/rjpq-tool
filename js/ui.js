@@ -34,6 +34,8 @@ function renderPlatforms() {
         container.appendChild(rowDiv);
     }
     renderPath();
+    // 若彈出視窗存在，同步更新
+    if (typeof window._syncPopup === 'function') window._syncPopup();
 }
 
 function renderPath() {
@@ -125,3 +127,170 @@ function updatePeerCount() {
         count.innerText = "";
     }
 }
+
+// --- 鍵盤快速鍵點亮平台 (Ctrl + 層數 + 平台) ---
+let shortcutBuffer = [];
+let shortcutTimer = null;
+
+document.addEventListener('keydown', (e) => {
+    // 只在按下 Ctrl 且為數字鍵時處理 (支援大鍵盤與小鍵盤數字)
+    const isDigit = /^[0-9]$/.test(e.key);
+    
+    if (e.ctrlKey && isDigit) {
+        e.preventDefault(); // 避免瀏覽器切換標籤頁 (Ctrl+1~Ctrl+9)
+        
+        const digit = parseInt(e.key);
+        shortcutBuffer.push(digit);
+        
+        // 清除舊的計時器
+        if (shortcutTimer) clearTimeout(shortcutTimer);
+        
+        if (shortcutBuffer.length === 1) {
+            // 第一位數：層數 (1-9 為第 1-9 層, 0 為第 10 層)
+            console.log(`快捷鍵輸入中: 層數 = ${digit === 0 ? 10 : digit}, 請輸入平台編號 (1-4)...`);
+            
+            // 2 秒內沒輸入第二位則失效
+            shortcutTimer = setTimeout(() => {
+                shortcutBuffer = [];
+                console.log("快捷鍵輸入超時");
+            }, 2000);
+        } 
+        else if (shortcutBuffer.length === 2) {
+            // 第二位數：平台 (1-4)
+            const rowDigit = shortcutBuffer[0];
+            const colDigit = shortcutBuffer[1];
+            
+            // 計算實際索引
+            // rowDigit: 1->row=9 (第1層), 0->row=0 (第10層), 2->row=8 (第2層)...
+            const rowIndex = (rowDigit === 0) ? 0 : (10 - rowDigit);
+            const colIndex = colDigit - 1;
+            
+            if (colDigit >= 1 && colDigit <= 4 && rowIndex >= 0 && rowIndex <= 9) {
+                const targetIndex = rowIndex * 4 + colIndex;
+                console.log(`快速鍵觸發: 第 ${rowDigit === 0 ? 10 : rowDigit} 層, 第 ${colDigit} 平台 (索引: ${targetIndex})`);
+                
+                // 執行點選行為 (使用目前選定的顏色)
+                simulatePlatformClick(targetIndex);
+            } else {
+                console.log("快捷鍵無效: 平台編號需在 1-4 之間");
+            }
+            
+            // 重設
+            shortcutBuffer = [];
+        }
+    }
+});
+
+// --- 即時燈號視窗 (Popup Window) ---
+let statusWindow = null;
+
+function openStatusWindow() {
+    if (statusWindow && !statusWindow.closed) {
+        statusWindow.focus();
+        return;
+    }
+
+    statusWindow = window.open("", "RJPQStatus", "width=300,height=450,menubar=no,toolbar=no,location=no,status=no");
+    if (!statusWindow) {
+        alert("請允許彈出視窗以啟動即時燈號窗。");
+        return;
+    }
+
+    const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>RJPQ 即時燈號</title>
+            <style>
+                body { background: #0f172a; color: white; font-family: sans-serif; padding: 10px; margin: 0; overflow: hidden; }
+                .grid { display: flex; flex-direction: column; gap: 4px; }
+                .row { display: flex; gap: 4px; align-items: center; }
+                .label { width: 20px; font-size: 10px; color: #64748b; text-align: right; }
+                .cell { flex: 1; height: 30px; border-radius: 4px; background: #334155; }
+                .cell.active-0 { background: #f87171; box-shadow: 0 0 8px #f87171; }
+                .cell.active-1 { background: #4ade80; box-shadow: 0 0 8px #4ade80; }
+                .cell.active-2 { background: #60a5fa; box-shadow: 0 0 8px #60a5fa; }
+                .cell.active-3 { background: #c084fc; box-shadow: 0 0 8px #c084fc; }
+                h3 { font-size: 14px; margin: 0 0 10px 0; color: #38bdf8; text-align: center; }
+            </style>
+        </head>
+        <body>
+            <h3>即時燈號窗</h3>
+            <div id="grid" class="grid"></div>
+            <script>
+                function update(data) {
+                    const container = document.getElementById("grid");
+                    container.innerHTML = "";
+                    for (let r = 0; r < 10; r++) {
+                        const row = document.createElement("div");
+                        row.className = "row";
+                        const lbl = document.createElement("div");
+                        lbl.className = "label";
+                        lbl.innerText = 10 - r;
+                        row.appendChild(lbl);
+                        for (let c = 0; c < 4; c++) {
+                            const cell = document.createElement("div");
+                            const val = data[r * 4 + c];
+                            cell.className = "cell" + (val < 4 ? " active-" + val : "");
+                            row.appendChild(cell);
+                        }
+                        container.appendChild(row);
+                    }
+                }
+                // 接收來自父視窗的訊息
+                let windowRoomData = [];
+                window.addEventListener("message", (e) => {
+                    if (e.data.type === "UPDATE") {
+                        windowRoomData = e.data.roomData;
+                        update(windowRoomData);
+                    }
+                });
+
+                // 快捷鍵邏輯 (與母視窗同步)
+                let sb = [];
+                let st = null;
+                window.addEventListener("keydown", (e) => {
+                    if (e.ctrlKey && e.key >= "0" && e.key <= "9") {
+                        e.preventDefault();
+                        const digit = parseInt(e.key);
+                        sb.push(digit);
+                        if (st) clearTimeout(st);
+                        if (sb.length === 1) {
+                            st = setTimeout(() => { sb = []; }, 2000);
+                        } else if (sb.length === 2) {
+                            const rD = sb[0];
+                            const cD = sb[1];
+                            const rIdx = (rD === 0) ? 0 : (10 - rD);
+                            const cIdx = cD - 1;
+                            if (cD >= 1 && cD <= 4 && rIdx >= 0 && rIdx <= 9) {
+                                const targetIdx = rIdx * 4 + cIdx;
+                                if (window.opener && !window.opener.closed) {
+                                    window.opener.simulatePlatformClick(targetIdx);
+                                }
+                            }
+                            sb = [];
+                        }
+                    }
+                });
+            </script>
+        </body>
+        </html>
+    `;
+    statusWindow.document.write(html);
+    statusWindow.document.close();
+
+    // 初始同步一次
+    setTimeout(() => {
+        statusWindow.postMessage({ type: "UPDATE", roomData: roomData }, "*");
+    }, 200);
+}
+
+// 修改 renderPlatforms 最後一行以同步彈出視窗
+const originalRenderPlatforms = renderPlatforms;
+renderPlatforms = function() {
+    originalRenderPlatforms();
+    if (statusWindow && !statusWindow.closed) {
+        statusWindow.postMessage({ type: "UPDATE", roomData: roomData }, "*");
+    }
+};

@@ -225,6 +225,168 @@ body {
     100% { opacity: 1; }
 }
 
+/* --- 房間入口介面樣式 --- */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(8px);
+    z-index: 2000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+.setup-card {
+    background: var(--card-bg);
+    border: 1px solid var(--glass-border);
+    padding: 3rem;
+    border-radius: 32px;
+    max-width: 500px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.7);
+    animation: slideUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(40px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.setup-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(135deg, #38bdf8, #c084fc);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.setup-subtitle {
+    color: #94a3b8;
+    margin-bottom: 2.5rem;
+    font-size: 1.1rem;
+}
+
+.input-group {
+    margin-bottom: 2rem;
+}
+
+#roomInput {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.3);
+    border: 2px solid var(--glass-border);
+    border-radius: 16px;
+    padding: 1rem 1.5rem;
+    color: white;
+    font-size: 1.25rem;
+    font-family: 'JetBrains+Mono', monospace;
+    text-align: center;
+    transition: all 0.3s;
+    box-sizing: border-box;
+}
+
+#roomInput:focus {
+    outline: none;
+    border-color: #38bdf8;
+    box-shadow: 0 0 20px rgba(56, 189, 248, 0.3);
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.setup-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.setup-btn {
+    padding: 1rem 2rem;
+    border-radius: 16px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    border: none;
+}
+
+.setup-btn:hover {
+    transform: scale(1.02) translateY(-2px);
+}
+
+.setup-btn:active {
+    transform: scale(0.98);
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #38bdf8, #0ea5e9);
+    color: white;
+    box-shadow: 0 8px 16px -4px rgba(56, 189, 248, 0.5);
+}
+
+.btn-secondary {
+    background: rgba(148, 163, 184, 0.1);
+    color: #e2e8f0;
+    border: 1px solid var(--glass-border);
+}
+
+.separator {
+    color: #64748b;
+    font-size: 0.9rem;
+    margin: 0.5rem 0;
+    position: relative;
+}
+
+.error-msg {
+    color: #ef4444;
+    margin-top: 1rem;
+    height: 1.2rem;
+    font-size: 0.9rem;
+}
+
+.instruction-section {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 16px;
+    border: 1px dashed var(--glass-border);
+}
+
+.instruction-title {
+    font-size: 1rem;
+    color: #38bdf8;
+    margin-bottom: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.instruction-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+}
+
+.instruction-item p {
+    font-size: 0.9rem;
+    color: #94a3b8;
+    margin-top: 0.5rem;
+}
+
+.key {
+    background: #1e293b;
+    border: 1px solid #475569;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-family: 'JetBrains+Mono', monospace;
+    font-size: 0.8rem;
+    color: #f1f5f9;
+}
+
 @media (max-width: 600px) {
     .header-section {
         flex-direction: column;
@@ -234,5 +396,14 @@ body {
     }
     .container-main {
         padding: 1rem;
+        margin-bottom: 20px;
+    }
+    #status-indicator {
+        position: relative;
+        bottom: auto;
+        right: auto;
+        margin: 20px auto;
+        width: fit-content;
+        justify-content: center;
     }
 }

@@ -106,12 +106,21 @@ function setupAsClient(conn) {
 function handleData(payload, fromConn = null) {
     console.log("收到資料:", payload.type);
     
+    // 防禦性驗證：確保 payload 是物件
+    if (!payload || typeof payload !== 'object') return;
+    
     switch(payload.type) {
         case 'INIT':
+            // 驗證：必須是長度為 40 的陣列，值在 0~4 之間
+            if (!Array.isArray(payload.data) || payload.data.length !== 40) return;
+            if (!payload.data.every(v => Number.isInteger(v) && v >= 0 && v <= 4)) return;
             roomData = payload.data;
             renderPlatforms();
             break;
         case 'UPDATE':
+            // 驗證：index 必須在 0~39，value 必須在 0~4
+            if (!Number.isInteger(payload.index) || payload.index < 0 || payload.index > 39) return;
+            if (!Number.isInteger(payload.value) || payload.value < 0 || payload.value > 4) return;
             roomData[payload.index] = payload.value;
             synchronizeColRules(payload.index, payload.value);
             renderPlatforms();
