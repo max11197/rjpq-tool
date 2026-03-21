@@ -3,10 +3,25 @@ let canvasElement = null;
 let ctx = null;
 let detectionTimeout = null;
 let isDetecting = false;
+let isPaused = false;
 let ocrWorker = null;
 
 let roiConfig = { x: 0, y: 0.7, w: 0.4, h: 0.15 };
 let lastDetectedStr = ""; // 記錄上次偵測到的數字序列，避免重複刷新
+
+function togglePauseDetection() {
+    isPaused = !isPaused;
+    const btn = document.getElementById("btnPause");
+    if (isPaused) {
+        btn.innerText = "恢復輸入";
+        setStatus("⏸️ 偵測已暫停輸入 (畫面仍在擷取中，可隨時恢復)。");
+    } else {
+        btn.innerText = "暫停輸入";
+        lastDetectedStr = ""; // 清除舊紀錄以免瞬間更新
+        const res = document.getElementById("resSelect") ? document.getElementById("resSelect").value : "當前";
+        setStatus(`📸 已恢復 ${res} 偵測！每 150ms 監聽輸入...`);
+    }
+}
 
 async function initOCR() {
     if (!ocrWorker) {
@@ -184,12 +199,19 @@ async function startDetectionParams() {
         stream.getVideoTracks()[0].onended = () => stopDetectionParams();
 
         isDetecting = true;
+        isPaused = false;
         lastDetectedStr = ""; // 重設緩存
         
         btn.disabled = false;
         btn.innerText = "停止偵測";
         btn.classList.add("btn-danger");
         btn.onclick = stopDetectionParams;
+
+        const btnP = document.getElementById("btnPause");
+        if(btnP) {
+            btnP.style.display = "inline-block";
+            btnP.innerText = "暫停輸入";
+        }
 
         setStatus(`📸 已啟動 ${res} 偵測！每 150ms 監聽輸入...`);
         const statusEl = document.getElementById("detect-status");
@@ -223,6 +245,9 @@ function stopDetectionParams() {
         btn.classList.remove("btn-danger");
         btn.onclick = startDetectionParams;
     }
+    
+    const btnP = document.getElementById("btnPause");
+    if(btnP) btnP.style.display = "none";
 
     const statusEl = document.getElementById("detect-status");
     if (statusEl) statusEl.className = "status-text";
@@ -275,7 +300,13 @@ function processOcrText(text) {
     
     // 從最後一行往前算
     for (let i = lines.length - 1; i >= 0; i--) {
-        const line = lines[i];
+        let line = lines[i];
+        
+        // 若句子中有冒號(中英文皆可)，只取右邊部分做偵測，避免玩家名字中夾帶的 1-4 數字干擾
+        const matchColon = line.match(/[:：]/);
+        if (matchColon) {
+            line = line.substring(line.indexOf(matchColon[0]) + 1);
+        }
         
         // 抓出所有由 1-4 和空格組成的結果
         const matches = line.match(/[1-4][1-4\s]*[1-4]|[1-4]/g);
@@ -286,10 +317,14 @@ function processOcrText(text) {
                 // 長度只能 1~10，且要跟前一次不同
                 if (s.length >= 1 && s.length <= 10) {
                     if (s !== lastDetectedStr) {
-                        console.log(`[OCR 偵測到變化] 原本: ${lastDetectedStr} -> 新的: ${s}`);
                         lastDetectedStr = s;
-                        setStatus(`✅ 偵測到更新: [ ${s} ]`);
-                        applyPathToRoom(selectedColor, s);
+                        if (!isPaused) {
+                            console.log(`[OCR 偵測到變化] -> 新的: ${s}`);
+                            setStatus(`✅ 偵測到更新: [ ${s} ]`);
+                            applyPathToRoom(selectedColor, s);
+                        } else {
+                            console.log(`[OCR 暫停中] 忽略: ${s}`);
+                        }
                     }
                     return; // 只要找到一組最新的，後面就不必看了
                 }
@@ -303,7 +338,7 @@ function applyPathToRoom(playerColor, pathStr) {
 
     let changed = false;
 
-    // 1. 清除該玩家所有現有層數
+    // 1. 僅清除該玩家自己現有的所有層數，不影響其他人
     for (let i = 0; i < 40; i++) {
         if (roomData[i] === playerColor) {
             roomData[i] = 4;
@@ -317,15 +352,9 @@ function applyPathToRoom(playerColor, pathStr) {
         const row = 9 - layer;
         const index = row * 4 + col;
         
-        if (roomData[index] !== playerColor) {
+        // 只有這格目前是空的，才填寫，遇到別人的位置則不覆蓋
+        if (roomData[index] === 4) {
             roomData[index] = playerColor;
-            
-            // 將同 row 的其他玩家被覆蓋掉也清空（同一層只能有一個格是正確答案）
-            for(let c=0; c<4; c++){
-                if (c !== col && roomData[row * 4 + c] !== 4) {
-                    roomData[row * 4 + c] = 4;
-                }
-            }
             changed = true;
         }
     }

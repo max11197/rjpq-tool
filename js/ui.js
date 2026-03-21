@@ -96,6 +96,9 @@ function simulatePlatformClick(index, forceColor) {
 }
 
 function onPlatformClick(index) {
+    if (typeof isObserver !== 'undefined' && isObserver) {
+        return; // 觀察模式無效
+    }
     simulatePlatformClick(index); // 使用者點擊，依據 selectedColor
 }
 
@@ -120,9 +123,11 @@ function updatePeerCount() {
     const count = document.getElementById('peer-count');
     if(!count) return;
     if (isHost && connections.length > 0) {
-        count.innerText = `● ${connections.length + 1} 位用戶在線`;
+        const pCount = connections.filter(c => !(c.metadata && c.metadata.isObserver)).length + 1;
+        const obsCount = connections.filter(c => c.metadata && c.metadata.isObserver).length;
+        count.innerText = `● ${pCount} 位玩家在線` + (obsCount > 0 ? ` (+${obsCount}觀看)` : "");
     } else if (!isHost && typeof hostConn !== 'undefined' && hostConn) {
-        count.innerText = `● 連線中`;
+        count.innerText = (typeof isObserver !== 'undefined' && isObserver) ? `● 觀察中` : `● 連線中`;
     } else {
         count.innerText = "";
     }
@@ -133,6 +138,8 @@ let shortcutBuffer = [];
 let shortcutTimer = null;
 
 document.addEventListener('keydown', (e) => {
+    if (typeof isObserver !== 'undefined' && isObserver) return;
+    
     // 只在按下 Ctrl 且為數字鍵時處理 (支援大鍵盤與小鍵盤數字)
     const isDigit = /^[0-9]$/.test(e.key);
     

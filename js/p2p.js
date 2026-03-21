@@ -25,7 +25,7 @@ function initP2P() {
 
 function tryToBeHost() {
     const hostPeerId = PEER_PREFIX + roomCode;
-    const conn = peer.connect(hostPeerId);
+    const conn = peer.connect(hostPeerId, { metadata: { isObserver: typeof isObserver !== 'undefined' ? isObserver : false } });
     
     let connectionTimeout = setTimeout(() => {
         if (!isHost && !hostConn) {
@@ -55,9 +55,12 @@ function setupAsHost(hostPeerId) {
     });
 
     peer.on('connection', (conn) => {
-        // 第一位進房的是 Host，後續最多接受 3 個連線 (共 4 位使用者)
-        if (connections.length >= 3) {
-            console.log("連線被拒絕: 房間已滿 (4人)");
+        const isConnObserver = conn.metadata && conn.metadata.isObserver;
+        const playerCount = connections.filter(c => !(c.metadata && c.metadata.isObserver)).length;
+        
+        // Host 算 1 位，最多只能再接受 3 位非觀看玩家，觀察者不佔位
+        if (!isConnObserver && playerCount >= 3) {
+            console.log("連線被拒絕: 玩家名額已滿 (4人)");
             conn.on('open', () => {
                 conn.send({ type: 'FULL' });
                 setTimeout(() => conn.close(), 500); 
@@ -65,7 +68,7 @@ function setupAsHost(hostPeerId) {
             return;
         }
 
-        console.log("新參加者加入:", conn.peer);
+        console.log(`新參加者加入: ${conn.peer} (觀察者: ${!!isConnObserver})`);
         connections.push(conn);
         updatePeerCount();
         

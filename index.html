@@ -103,6 +103,10 @@
 
             <div class="input-group">
                 <input type="text" id="roomInput" placeholder="輸入房間代碼 (例如: 1234)" maxlength="20">
+                <label style="color: #94a3b8; font-size: 0.9rem; margin-top: 15px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;">
+                    <input type="checkbox" id="chkObserver">
+                    以觀察模式加入 (只看、不佔人數)
+                </label>
             </div>
 
             <div class="setup-actions">
@@ -137,6 +141,7 @@
                 <option value="2560x1440">2560x1440 解析度</option>
             </select>
             <button id="btnCapture" class="capture-btn" onclick="startDetectionParams()">直接開始偵測</button>
+            <button id="btnPause" class="capture-btn" style="display: none; border-color: #f59e0b; color: #f59e0b;" onclick="togglePauseDetection()">暫停輸入</button>
             <div id="detect-status" class="status-text">點選左方按鈕啟動對話輸入辨識。預設抓取特定比例的左下角。</div>
         </div>
 

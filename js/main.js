@@ -1,6 +1,7 @@
 // --- 全域變數 ---
 const urlParams = new URLSearchParams(window.location.search);
 let roomCode = urlParams.get("code");
+const isObserver = urlParams.get("obs") === "1";
 
 let roomData = Array(40).fill(4); // 40 個平台 (10x4)，預設顏色為 4 (灰色)
 let selectedColor = -1;
@@ -24,6 +25,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (document.getElementById('roomCodeDisplay')) {
             document.getElementById('roomCodeDisplay').textContent = roomCode;
+        }
+
+        if (isObserver) {
+            const controls = document.querySelector('.controls');
+            if (controls) {
+                controls.innerHTML = `<button class="capture-btn" onclick="openStatusWindow()" title="開啟置頂小視窗">開啟即時燈號窗</button>`;
+            }
+            document.querySelectorAll('.ai-controls').forEach(el => el.style.display = 'none');
         }
 
         // 啟動 P2P 與渲染
@@ -51,7 +60,8 @@ function joinRoom() {
     }
 
     // 跳轉
-    window.location.search = `?code=${encodeURIComponent(code)}`;
+    const obsChecked = document.getElementById('chkObserver').checked;
+    window.location.search = `?code=${encodeURIComponent(code)}` + (obsChecked ? "&obs=1" : "");
 }
 
 // 建立房間 (產生隨機 ID)
