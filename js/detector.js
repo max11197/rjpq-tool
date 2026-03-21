@@ -1,13 +1,3 @@
-/**
- * 自動畫面偵測系統 v4
- * - 移除房間 OCR，使用者自行在 UI 選好房間後按下偵測
- * - 僅追蹤「層數面板兩數之和」上升 → 觸發點亮平台
- * - 血條像素偵測決定欄位 1~4（無需 OCR，即時）
- */
-
-// ====================================================================
-// Canvas / 媒體串流
-// ====================================================================
 let videoElement = null;
 let canvasElement = null;
 let ctx = null;
@@ -15,34 +5,12 @@ let detectionTimeout = null;
 let isDetecting = false;
 let ocrWorker = null;
 
-// ====================================================================
-// 遊戲平台 X 座標常數（基準解析度 1600x900）
-// 根據影片觀察，4 個平台的橫向比例範圍（0.0 ~ 1.0）
-// 若偵測偏移，請微調 min/max
-// ====================================================================
-const PLATFORM_COLS = [
-    { min: 0.10, max: 0.32 },   // 平台 1
-    { min: 0.32, max: 0.52 },   // 平台 2
-    { min: 0.52, max: 0.73 },   // 平台 3
-    { min: 0.73, max: 0.95 },   // 平台 4
-];
+let roiConfig = { x: 0, y: 0.7, w: 0.4, h: 0.15 };
+let lastDetectedStr = ""; // 記錄上次偵測到的數字序列，避免重複刷新
 
-// 層數面板 ROI：畫面左側顯示兩個層數數字的小型螢幕
-const LAYER_PANEL_ROI = { x: 0.0, y: 0.15, w: 0.14, h: 0.75 };
-
-// ====================================================================
-// 追蹤狀態
-// ====================================================================
-let lastLayerSum = -1;      // 上一輪層數面板兩數之和
-let lastKnownLayer = 0;     // 已確認通過的層數（0-indexed）
-let stableColHistory = [];  // 最近幾幀血條所在的欄位，取眾數
-
-// ====================================================================
-// 初始化 OCR
-// ====================================================================
 async function initOCR() {
     if (!ocrWorker) {
-        setStatus("正在載入 Tesseract.js 與中文識別模型（首次需要一點時間）...");
+        setStatus("正在載入 Tesseract.js 與中文識別模型...");
         ocrWorker = await Tesseract.createWorker("chi_tra");
         await ocrWorker.setParameters({
             tessedit_pageseg_mode: Tesseract.PSM.SPARSE_TEXT,
@@ -55,14 +23,34 @@ function setStatus(msg) {
     if (el) el.innerText = msg;
 }
 
-// ====================================================================
-// 啟動 / 停止偵測
-// ====================================================================
+function updateRoiBox() {
+    roiConfig.x = document.getElementById("roi-x").value / 100;
+    roiConfig.y = document.getElementById("roi-y").value / 100;
+    roiConfig.w = document.getElementById("roi-w").value / 100;
+    roiConfig.h = document.getElementById("roi-h").value / 100;
+    
+    document.getElementById("val-x").innerText = `${document.getElementById("roi-x").value}%`;
+    document.getElementById("val-y").innerText = `${document.getElementById("roi-y").value}%`;
+    document.getElementById("val-w").innerText = `${document.getElementById("roi-w").value}%`;
+    document.getElementById("val-h").innerText = `${document.getElementById("roi-h").value}%`;
+
+    const box = document.getElementById("roi-box");
+    box.style.left = `${roiConfig.x * 100}%`;
+    box.style.top = `${roiConfig.y * 100}%`;
+    box.style.width = `${roiConfig.w * 100}%`;
+    box.style.height = `${roiConfig.h * 100}%`;
+}
+
 async function startDetection() {
+    if (selectedColor === -1) {
+        alert("請先選擇一個玩家位置 (點擊玩家1~4按鈕) 再啟動偵測。");
+        return;
+    }
+
     if (isDetecting) return;
 
     const btn = document.getElementById("btnCapture");
-    btn.innerText = "正在初始化偵測環境...";
+    btn.innerText = "正在取得畫面...";
     btn.disabled = true;
 
     try {
@@ -73,42 +61,59 @@ async function startDetection() {
             audio: false
         });
 
-        videoElement = document.getElementById("screenVideo");
+        videoElement = document.getElementById("previewVideo");
         videoElement.srcObject = stream;
         await videoElement.play();
 
         canvasElement = document.getElementById("screenCanvas");
-        canvasElement.width = videoElement.videoWidth;
-        canvasElement.height = videoElement.videoHeight;
-        ctx = canvasElement.getContext("2d", { willReadFrequently: true });
 
         stream.getVideoTracks()[0].onended = () => stopDetection();
 
-        isDetecting = true;
-        resetState();
+        // 顯示設定區域
+        document.getElementById("ai-controls-main").style.display = "none";
+        document.getElementById("roi-setup").style.display = "flex";
+        
+        // 初始化 ROI UI
+        document.getElementById("roi-x").value = parseInt(roiConfig.x * 100);
+        document.getElementById("roi-y").value = parseInt(roiConfig.y * 100);
+        document.getElementById("roi-w").value = parseInt(roiConfig.w * 100);
+        document.getElementById("roi-h").value = parseInt(roiConfig.h * 100);
+        updateRoiBox();
 
-        setStatus("📸 偵測啟動！正在追蹤向上傳送事件...");
-        const statusEl = document.getElementById("detect-status");
-        if (statusEl) statusEl.className = "status-text detecting";
-
-        btn.innerText = "停止偵測";
-        btn.classList.add("btn-danger");
         btn.disabled = false;
-        btn.onclick = stopDetection;
-
-        startAnalysisLoop();
+        setStatus("請設定框區。");
 
     } catch (err) {
         console.error("擷取畫面失敗:", err);
-        btn.innerText = "偵測畫面輸入";
+        btn.innerText = "偵測對話框輸入";
         btn.disabled = false;
         alert("無法讀取螢幕畫面，請確認是否已授權瀏覽器分享視窗。");
     }
 }
 
+function confirmRoiAndStart() {
+    document.getElementById("roi-setup").style.display = "none";
+    document.getElementById("ai-controls-main").style.display = "flex";
+    
+    isDetecting = true;
+    lastDetectedStr = ""; // 重設緩存
+    
+    setStatus("📸 正在每 500ms 偵測對話框中...");
+    const statusEl = document.getElementById("detect-status");
+    if (statusEl) statusEl.className = "status-text detecting";
+
+    const btn = document.getElementById("btnCapture");
+    btn.innerText = "停止偵測";
+    btn.classList.add("btn-danger");
+    btn.onclick = stopDetection;
+
+    startAnalysisLoop();
+}
+
 function stopDetection() {
-    if (!isDetecting) return;
     isDetecting = false;
+    document.getElementById("roi-setup").style.display = "none";
+    document.getElementById("ai-controls-main").style.display = "flex";
 
     if (detectionTimeout) {
         clearTimeout(detectionTimeout);
@@ -120,231 +125,219 @@ function stopDetection() {
     }
 
     const btn = document.getElementById("btnCapture");
-    btn.innerText = "偵測畫面輸入";
-    btn.classList.remove("btn-danger");
-    btn.onclick = startDetection;
+    if(btn) {
+        btn.innerText = "偵測對話框輸入";
+        btn.classList.remove("btn-danger");
+        btn.onclick = startDetection;
+    }
 
     const statusEl = document.getElementById("detect-status");
     if (statusEl) statusEl.className = "status-text";
     setStatus("偵測已停止。");
 }
 
-function resetState() {
-    lastLayerSum = -1;
-    lastKnownLayer = 0;
-    stableColHistory = [];
+/* =========================================================
+   新增：利用固定解析度自動選擇擷取窗格 (免拖拉 UI) 
+   ========================================================= */
+const PRESET_ROIS = {
+    "800x600": { x: 0.0, y: 0.75, w: 0.60, h: 0.25 },
+    "1024x768": { x: 0.0, y: 0.80, w: 0.50, h: 0.20 },
+    "1280x720": { x: 0.0, y: 0.80, w: 0.45, h: 0.20 },
+    "1366x768": { x: 0.0, y: 0.80, w: 0.40, h: 0.20 },
+    "1920x1080": { x: 0.0, y: 0.85, w: 0.30, h: 0.15 },
+    "2560x1440": { x: 0.0, y: 0.88, w: 0.25, h: 0.12 }
+};
+
+async function startDetectionParams() {
+    if (selectedColor === -1) {
+        alert("請先選擇一個玩家位置 (點擊玩家1~4按鈕) 再啟動偵測。");
+        return;
+    }
+
+    if (isDetecting) return;
+
+    const res = document.getElementById("resSelect").value;
+    if (PRESET_ROIS[res]) {
+        // 設定寫死的 ROI
+        roiConfig = PRESET_ROIS[res];
+    }
+
+    const btn = document.getElementById("btnCapture");
+    btn.innerText = "正在取得畫面...";
+    btn.disabled = true;
+
+    try {
+        await initOCR();
+
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+            video: { displaySurface: "window" },
+            audio: false
+        });
+
+        // 直接用隱藏的 screenVideo 擷取
+        videoElement = document.getElementById("screenVideo");
+        videoElement.srcObject = stream;
+        await videoElement.play();
+
+        canvasElement = document.getElementById("screenCanvas");
+
+        stream.getVideoTracks()[0].onended = () => stopDetectionParams();
+
+        isDetecting = true;
+        lastDetectedStr = ""; // 重設緩存
+        
+        btn.disabled = false;
+        btn.innerText = "停止偵測";
+        btn.classList.add("btn-danger");
+        btn.onclick = stopDetectionParams;
+
+        setStatus(`📸 已啟動 ${res} 偵測！每 150ms 監聽輸入...`);
+        const statusEl = document.getElementById("detect-status");
+        if (statusEl) statusEl.className = "status-text detecting";
+
+        startAnalysisLoop();
+
+    } catch (err) {
+        console.error("擷取畫面失敗:", err);
+        btn.innerText = "直接開始偵測";
+        btn.disabled = false;
+        alert("無法讀取螢幕畫面，請確認是否已授權瀏覽器分享視窗。");
+    }
 }
 
-// ====================================================================
-// 主迴圈
-// ====================================================================
+function stopDetectionParams() {
+    isDetecting = false;
+    
+    if (detectionTimeout) {
+        clearTimeout(detectionTimeout);
+        detectionTimeout = null;
+    }
+    if (videoElement && videoElement.srcObject) {
+        videoElement.srcObject.getTracks().forEach(t => t.stop());
+        videoElement.srcObject = null;
+    }
+
+    const btn = document.getElementById("btnCapture");
+    if(btn) {
+        btn.innerText = "直接開始偵測";
+        btn.classList.remove("btn-danger");
+        btn.onclick = startDetectionParams;
+    }
+
+    const statusEl = document.getElementById("detect-status");
+    if (statusEl) statusEl.className = "status-text";
+    setStatus("偵測已停止。");
+}
+
 async function startAnalysisLoop() {
     if (!isDetecting) return;
 
     if (videoElement.videoWidth > 0 && videoElement.videoHeight > 0) {
-        if (canvasElement.width !== videoElement.videoWidth) {
-            canvasElement.width = videoElement.videoWidth;
-            canvasElement.height = videoElement.videoHeight;
-        }
-        ctx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+        // 設定 Canvas 符合 ROI 的解析度，增強辨識
+        const vw = videoElement.videoWidth;
+        const vh = videoElement.videoHeight;
+        
+        const cropX = Math.floor(vw * roiConfig.x);
+        const cropY = Math.floor(vh * roiConfig.y);
+        const cropW = Math.max(1, Math.floor(vw * roiConfig.w));
+        const cropH = Math.max(1, Math.floor(vh * roiConfig.h));
+
+        // 兩倍放大有利於 OCR
+        canvasElement.width = cropW * 2;
+        canvasElement.height = cropH * 2;
+        ctx = canvasElement.getContext("2d", { willReadFrequently: true });
+        
+        // 將畫面部分畫進 Canvas，黑底白字高反差
+        ctx.filter = "invert(1) contrast(2) brightness(1.2)";
+        ctx.drawImage(videoElement, 
+            cropX, cropY, cropW, cropH,
+            0, 0, canvasElement.width, canvasElement.height
+        );
 
         try {
-            await detectPlatformJumpState();
+            const { data: { text } } = await ocrWorker.recognize(canvasElement);
+            processOcrText(text);
         } catch (e) {
-            console.error("偵測錯誤:", e);
+            console.error("OCR 錯誤:", e);
         }
     }
 
     if (isDetecting) {
-        // 偵測通關後切成大間隔，平常 150ms 高速追蹤
-        const delay = 150;
-        detectionTimeout = setTimeout(startAnalysisLoop, delay);
+        detectionTimeout = setTimeout(startAnalysisLoop, 150);
     }
 }
 
-// ====================================================================
-// 工具：紅色血條像素偵測
-// 血條特徵：R > 170、G < 70、B < 70
-// 掃描範圍：Y 軸 8%~88%（排除頂部 UI 與底部狀態欄）
-// ====================================================================
-function findRedHealthBar() {
-    const cw = canvasElement.width;
-    const ch = canvasElement.height;
-    const scanY0 = Math.floor(ch * 0.08);
-    const scanY1 = Math.floor(ch * 0.88);
-    const scanH = scanY1 - scanY0;
+function processOcrText(text) {
+    if (!text) return;
 
-    const imageData = ctx.getImageData(0, scanY0, cw, scanH);
-    const data = imageData.data;
-
-    let sumX = 0, count = 0, minX = cw, maxX = 0;
-
-    for (let py = 0; py < scanH; py += 2) {
-        for (let px = 0; px < cw; px += 2) {
-            const idx = (py * cw + px) * 4;
-            if (data[idx] > 170 && data[idx + 1] < 70 && data[idx + 2] < 70) {
-                sumX += px;
-                count++;
-                if (px < minX) minX = px;
-                if (px > maxX) maxX = px;
+    // 依行切割
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    
+    // 從最後一行往前算
+    for (let i = lines.length - 1; i >= 0; i--) {
+        const line = lines[i];
+        
+        // 抓出所有由 1-4 和空格組成的結果
+        const matches = line.match(/[1-4][1-4\s]*[1-4]|[1-4]/g);
+        if (matches) {
+            for (let j = matches.length - 1; j >= 0; j--) {
+                const s = matches[j].replace(/\s+/g, '');
+                
+                // 長度只能 1~10，且要跟前一次不同
+                if (s.length >= 1 && s.length <= 10) {
+                    if (s !== lastDetectedStr) {
+                        console.log(`[OCR 偵測到變化] 原本: ${lastDetectedStr} -> 新的: ${s}`);
+                        lastDetectedStr = s;
+                        setStatus(`✅ 偵測到更新: [ ${s} ]`);
+                        applyPathToRoom(selectedColor, s);
+                    }
+                    return; // 只要找到一組最新的，後面就不必看了
+                }
             }
         }
     }
-
-    // 需要足夠寬（至少畫面 3%）才算血條，避免誤判技能特效
-    if (count < 15 || (maxX - minX) < cw * 0.03) {
-        return { found: false, cx: -1 };
-    }
-
-    return { found: true, cx: Math.floor(sumX / count) };
 }
 
-// 將血條 X 比對 PLATFORM_COLS，回傳欄位 0~3，找不到回 -1
-function xToColumn(cx, cw) {
-    const ratio = cx / cw;
-    for (let i = 0; i < PLATFORM_COLS.length; i++) {
-        if (ratio >= PLATFORM_COLS[i].min && ratio < PLATFORM_COLS[i].max) return i;
-    }
-    return -1;
-}
+function applyPathToRoom(playerColor, pathStr) {
+    if (playerColor === -1) return;
 
-// 取 stableColHistory 的眾數
-function getModeColumn() {
-    if (stableColHistory.length === 0) return -1;
-    const freq = {};
-    stableColHistory.forEach(c => { freq[c] = (freq[c] || 0) + 1; });
-    return parseInt(Object.keys(freq).reduce((a, b) => freq[a] > freq[b] ? a : b));
-}
+    let changed = false;
 
-// 防呆補缺：其他三格都亮了就補最後空格
-function resolveTargetCol(logicRow, preferredCol) {
-    const rowStart = logicRow * 4;
-    let occupied = 0, emptyIdx = -1;
-    for (let i = 0; i < 4; i++) {
-        const v = roomData[rowStart + i];
-        if (v !== 4 && v !== selectedColor) occupied++;
-        else if (v === 4) emptyIdx = i;
-    }
-    if (occupied === 3 && emptyIdx !== -1) {
-        console.log(`[防呆補位] row=${logicRow} → 欄位 ${emptyIdx + 1}`);
-        return emptyIdx;
-    }
-    return preferredCol;
-}
-
-// ====================================================================
-// 平台傳送偵測主函式
-// ====================================================================
-async function detectPlatformJumpState() {
-    const cw = canvasElement.width;
-    const ch = canvasElement.height;
-
-    // ==== A. 偵測「通過」字樣（裁切畫面中央小塊）====
-    const passCanvas = document.createElement("canvas");
-    passCanvas.width = Math.floor(cw * 0.52);
-    passCanvas.height = Math.floor(ch * 0.32);
-    const pCtx = passCanvas.getContext("2d");
-    pCtx.drawImage(canvasElement,
-        Math.floor(cw * 0.24), Math.floor(ch * 0.28),
-        passCanvas.width, passCanvas.height,
-        0, 0, passCanvas.width, passCanvas.height
-    );
-    const { data: { text: centerText } } = await ocrWorker.recognize(passCanvas);
-
-    if (centerText.includes("通過") || centerText.includes("過關") || centerText.includes("完成")) {
-        setStatus("🎉 偵測到通關！自動重設平台，等待下一局...");
-        if (typeof window.requestReset === 'function') window.requestReset();
-        resetState();
-        // 通關後大幅降低頻率（30 秒）直到下次手動重啟或偵測到新局
-        if (isDetecting) {
-            clearTimeout(detectionTimeout);
-            detectionTimeout = setTimeout(startAnalysisLoop, 30000);
-        }
-        return;
-    }
-
-    // ==== B. 像素掃描：即時記錄血條所在欄位 ====
-    const bar = findRedHealthBar();
-    let currentCol = -1;
-    if (bar.found) {
-        currentCol = xToColumn(bar.cx, cw);
-        if (currentCol >= 0) {
-            stableColHistory.push(currentCol);
-            if (stableColHistory.length > 8) stableColHistory.shift();
+    // 1. 清除該玩家所有現有層數
+    for (let i = 0; i < 40; i++) {
+        if (roomData[i] === playerColor) {
+            roomData[i] = 4;
+            changed = true;
         }
     }
 
-    // ==== C. OCR 偵測左側層數面板（小塊，速度快）====
-    const panelCanvas = document.createElement("canvas");
-    panelCanvas.width = Math.floor(cw * LAYER_PANEL_ROI.w * 2); // 放大 2 倍辨識
-    panelCanvas.height = Math.floor(ch * LAYER_PANEL_ROI.h * 2);
-    const panelCtx = panelCanvas.getContext("2d");
-    panelCtx.filter = "invert(1) contrast(3) brightness(1.4)";
-    panelCtx.drawImage(canvasElement,
-        Math.floor(cw * LAYER_PANEL_ROI.x), Math.floor(ch * LAYER_PANEL_ROI.y),
-        Math.floor(cw * LAYER_PANEL_ROI.w), Math.floor(ch * LAYER_PANEL_ROI.h),
-        0, 0, panelCanvas.width, panelCanvas.height
-    );
-    const { data: { text: panelText } } = await ocrWorker.recognize(panelCanvas);
-
-    // 取出 1~10 的數字，去重後取最小兩個
-    const uniqueNums = [...new Set(
-        (panelText.match(/\d+/g) || [])
-            .map(Number)
-            .filter(n => n >= 1 && n <= 10)
-            .sort((a, b) => a - b)
-    )].slice(0, 2);
-
-    const currentSum = uniqueNums.reduce((a, b) => a + b, 0);
-
-    // ==== D. 判斷傳送：兩數之和增加 ====
-    if (lastLayerSum < 0) {
-        // 初次進入，記錄基準值
-        if (currentSum > 0) {
-            lastLayerSum = currentSum;
-            lastKnownLayer = uniqueNums[0] ? uniqueNums[0] - 1 : 0;
-        }
-        const colLabel = currentCol >= 0 ? `平台 ${currentCol + 1}` : "移動中";
-        setStatus(`🔍 初始化 — 面板:[${uniqueNums.join(",")}] | 血條:${colLabel}`);
-        return;
-    }
-
-    if (currentSum > lastLayerSum) {
-        // 層數和增加 → 向上傳送
-        const layersJumped = Math.round((currentSum - lastLayerSum) / 2);
-        const jumpCol = getModeColumn() >= 0 ? getModeColumn() : 0;
-
-        console.log(`[傳送] 層數和 ${lastLayerSum}→${currentSum}，上升 ${layersJumped} 層，欄位眾數:${jumpCol + 1}`);
-
-        for (let j = 0; j < layersJumped; j++) {
-            const passedLayer = lastKnownLayer + j;  // 0-indexed
-            const logicRow = 9 - passedLayer;        // UI row（第1層=row9）
-            if (logicRow < 0) continue;
-
-            const finalCol = resolveTargetCol(logicRow, jumpCol);
-            if (typeof window.simulatePlatformClick === 'function') {
-                window.simulatePlatformClick(logicRow * 4 + finalCol);
+    // 2. 套用新字串填入位置
+    for (let layer = 0; layer < pathStr.length && layer < 10; layer++) {
+        const col = parseInt(pathStr[layer], 10) - 1; // '1' 變 0
+        const row = 9 - layer;
+        const index = row * 4 + col;
+        
+        if (roomData[index] !== playerColor) {
+            roomData[index] = playerColor;
+            
+            // 將同 row 的其他玩家被覆蓋掉也清空（同一層只能有一個格是正確答案）
+            for(let c=0; c<4; c++){
+                if (c !== col && roomData[row * 4 + c] !== 4) {
+                    roomData[row * 4 + c] = 4;
+                }
             }
-            console.log(`[🔴點燈] 第 ${passedLayer + 1} 層 row=${logicRow} col=${finalCol + 1}`);
+            changed = true;
         }
+    }
 
-        lastKnownLayer += layersJumped;
-        lastLayerSum = currentSum;
-        stableColHistory = []; // 清空，重新累積下層軌跡
-
-        setStatus(`✅ 傳送！已過第 ${lastKnownLayer} 層 — 面板:[${uniqueNums.join(",")}] 欄位:${jumpCol + 1}`);
-
-    } else {
-        // 等待傳送
-        const colLabel = currentCol >= 0 ? `平台 ${currentCol + 1}` : "移動中";
-        setStatus(`👀 等待傳送 — 面板:[${uniqueNums.join(",")}] 和=${currentSum} | 血條:${colLabel}`);
-
-        // 層數和縮小 → 猜錯被傳回底層，重置
-        if (currentSum > 0 && currentSum < lastLayerSum - 1) {
-            console.warn("[警告] 層數和縮小，可能猜錯，重置追蹤");
-            lastLayerSum = currentSum;
-            lastKnownLayer = 0;
-            stableColHistory = [];
+    if (changed) {
+        if (typeof renderPlatforms === 'function') renderPlatforms();
+        
+        const payload = { type: 'FULL_SYNC', data: roomData };
+        if (isHost && typeof broadcast === 'function') {
+            broadcast(payload);
+        } else if (typeof hostConn !== 'undefined' && hostConn && hostConn.open) {
+            hostConn.send(payload);
         }
     }
 }

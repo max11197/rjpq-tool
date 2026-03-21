@@ -126,11 +126,48 @@
             </div>
         </div>
 
-        <!-- AI 視覺偵測控制區 (暫時隱藏) -->
-        <div class="ai-controls" style="display: none;">
-            <button id="btnCapture" class="capture-btn" onclick="startDetection()">偵測畫面輸入</button>
-            <div id="detect-status" class="status-text">偵測系統未啟動。點選左方按鈕可自動追蹤您的跳躍。</div>
+        <!-- AI 視覺偵測控制區 (預設顯示) -->
+        <div class="ai-controls" id="ai-controls-main" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <select id="resSelect" class="name-input" style="min-width: 150px; background: rgba(0,0,0,0.5); border-radius: 8px;">
+                <option value="800x600">800x600 解析度</option>
+                <option value="1024x768">1024x768 解析度</option>
+                <option value="1280x720">1280x720 解析度</option>
+                <option value="1366x768" selected>1366x768 解析度</option>
+                <option value="1920x1080">1920x1080 解析度</option>
+                <option value="2560x1440">2560x1440 解析度</option>
+            </select>
+            <button id="btnCapture" class="capture-btn" onclick="startDetectionParams()">直接開始偵測</button>
+            <div id="detect-status" class="status-text">點選左方按鈕啟動對話輸入辨識。預設抓取特定比例的左下角。</div>
         </div>
+
+        <!-- 
+        ［舊版的自訂 ROI 設定區］已註解保留，供未來備用
+        <div id="roi-setup" class="ai-controls" style="display: none; flex-direction: column; align-items: stretch;">
+            <div style="color: #38bdf8; font-weight: bold; margin-bottom: 15px;">請調整下方滑桿，將紅框對準遊戲的「聊天輸入框」</div>
+            <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                <div style="flex: 1; position: relative; min-width: 300px;">
+                    <video id="previewVideo" autoplay muted style="width: 100%; border: 1px solid #334155; border-radius: 4px;"></video>
+                    <div id="roi-box" style="position: absolute; border: 2px solid #ef4444; background: rgba(239, 68, 68, 0.3); pointer-events: none; left: 0%; top: 70%; width: 40%; height: 15%;"></div>
+                </div>
+                <div style="width: 200px; display: flex; flex-direction: column; gap: 15px; font-size: 0.9rem; color: #cbd5e1;">
+                    <label style="display: flex; flex-direction: column;">X 偏移: <span id="val-x">0%</span>
+                        <input type="range" id="roi-x" min="0" max="100" value="0" oninput="updateRoiBox()">
+                    </label>
+                    <label style="display: flex; flex-direction: column;">Y 偏移: <span id="val-y">70%</span>
+                        <input type="range" id="roi-y" min="0" max="100" value="70" oninput="updateRoiBox()">
+                    </label>
+                    <label style="display: flex; flex-direction: column;">寬度: <span id="val-w">40%</span>
+                        <input type="range" id="roi-w" min="5" max="100" value="40" oninput="updateRoiBox()">
+                    </label>
+                    <label style="display: flex; flex-direction: column;">高度: <span id="val-h">15%</span>
+                        <input type="range" id="roi-h" min="5" max="100" value="15" oninput="updateRoiBox()">
+                    </label>
+                    <button class="capture-btn" onclick="confirmRoiAndStart()" style="margin-top: auto; border-color: #4ade80; color: #4ade80;">確定並開始</button>
+                    <button class="capture-btn btn-danger" onclick="stopDetection()">取消/停止</button>
+                </div>
+            </div>
+        </div>
+        -->
 
         <div class="controls">
             <button class="color-btn btn-0" id="btn0" onclick="setSelectedColor(0)">玩家 1 (101)</button>

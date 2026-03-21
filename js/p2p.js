@@ -134,6 +134,14 @@ function handleData(payload, fromConn = null) {
             renderPlatforms();
             if (isHost) broadcast({ type: 'RESET' }, fromConn);
             break;
+        case 'FULL_SYNC':
+            if (!Array.isArray(payload.data) || payload.data.length !== 40) return;
+            roomData = [...payload.data];
+            if (typeof renderPlatforms === 'function') renderPlatforms();
+            if (isHost && typeof broadcast === 'function') {
+                broadcast({ type: 'FULL_SYNC', data: payload.data }, fromConn);
+            }
+            break;
         case 'FULL':
             window.isRoomFullExited = true;
             updateStatus("offline", "❌ 該房間已達 4 人上限，無法進入");
