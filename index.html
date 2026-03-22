@@ -91,6 +91,24 @@
                 opacity: 0.7;
             }
         }
+
+        #shortcut-bubble {
+            display: none;
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(56, 189, 248, 0.95);
+            color: #0f172a;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-weight: bold;
+            font-size: 1.2rem;
+            z-index: 1000;
+            box-shadow: 0 4px 15px rgba(56, 189, 248, 0.5);
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
     </style>
 </head>
 
@@ -135,23 +153,23 @@
             style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
             <select id="resSelect" class="name-input"
                 style="min-width: 150px; background: rgba(0,0,0,0.5); border-radius: 8px;">
-                <option value="2560x1440">2560x1440 解析度</option>
-                <option value="1920x1080">1920x1080 解析度</option>
-                <option value="1680x1050">1680x1050 解析度</option>
-                <option value="1600x1200">1600x1200 解析度</option>
-                <option value="1600x1024">1600x1024 解析度</option>
-                <option value="1600x900">1600x900 解析度</option>
-                <option value="1440x1080">1440x1080 解析度</option>
-                <option value="1440x900">1440x900 解析度</option>
-                <option value="1366x768" selected>1366x768 解析度</option>
-                <option value="1360x768">1360x768 解析度</option>
-                <option value="1280x1024">1280x1024 解析度</option>
-                <option value="1280x960">1280x960 解析度</option>
-                <option value="1280x800">1280x800 解析度</option>
-                <option value="1280x768">1280x768 解析度</option>
-                <option value="1280x720">1280x720 解析度</option>
-                <option value="1024x768">1024x768 解析度</option>
-                <option value="800x600">800x600 解析度</option>
+                <option value="2560x1440">2560x1440</option>
+                <option value="1920x1080">1920x1080</option>
+                <option value="1680x1050">1680x1050</option>
+                <option value="1600x1200">1600x1200</option>
+                <option value="1600x1024">1600x1024</option>
+                <option value="1600x900">1600x900</option>
+                <option value="1440x1080">1440x1080</option>
+                <option value="1440x900">1440x900</option>
+                <option value="1366x768" selected>1366x768</option>
+                <option value="1360x768">1360x768</option>
+                <option value="1280x1024">1280x1024</option>
+                <option value="1280x960">1280x960</option>
+                <option value="1280x800">1280x800</option>
+                <option value="1280x768">1280x768</option>
+                <option value="1280x720">1280x720</option>
+                <option value="1024x768">1024x768</option>
+                <option value="800x600">800x600</option>
             </select>
             <button id="btnCapture" class="capture-btn" onclick="startDetectionParams()">自動偵測</button>
             <button id="btnManualRoi" class="capture-btn" onclick="startDetectionParams(true)">手動選取</button>
@@ -177,7 +195,7 @@
                     oninput="document.getElementById('intervalRange').value = this.value"> ms
             </div>
 
-            <div id="detect-status" class="status-text">點選左方按鈕啟動對話輸入辨識。預設抓取特定比例的左下角。</div>
+            <div id="detect-status" class="status-text">先選擇左側解析度後點選按鈕啟動對話輸入辨識。預設抓取特定比例的左下角。</div>
         </div>
 
         <!-- 手動 ROI 設定區 -->
@@ -287,7 +305,8 @@
                 </div>
             </div>
             <div class="instruction-note" style="font-size: 0.8rem; color: #64748b; margin-top: 10px;">
-                * 使用「開啟即時燈號窗」可開啟一個小視窗供您放在遊戲畫面旁邊對準
+                * 使用「開啟即時燈號窗」可開啟一個小視窗供您放在遊戲畫面旁邊對準<br>
+                * 若輸入快捷鍵途中想立即取消，請按 <span class="key">C</span> 鍵
             </div>
         </div>
     </div>
@@ -298,6 +317,9 @@
         <span id="status-text">正在初始化 P2P 服務...</span>
         <span id="peer-count" style="margin-left: 8px; font-weight: bold; color: #38bdf8;"></span>
     </div>
+
+    <!-- 畫面中央的快捷鍵提示氣泡 -->
+    <div id="shortcut-bubble"></div>
 
     <!-- 隱藏的 DOM，用於接收並處理螢幕畫面 -->
     <video id="screenVideo" autoplay hidden></video>

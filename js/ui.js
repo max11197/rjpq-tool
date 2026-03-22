@@ -192,11 +192,58 @@ function updatePeerCount() {
 let shortcutBuffer = [];
 let shortcutTimer = null;
 
+window.showShortcutBubble = function(text) {
+    const bubble = document.getElementById('shortcut-bubble');
+    if (bubble) {
+        bubble.innerText = text;
+        bubble.style.display = 'block';
+    }
+
+    if (statusWindow && !statusWindow.closed) {
+        if (isPiPMode) {
+            const pipBubble = statusWindow.document.getElementById('pip-shortcut-bubble');
+            if (pipBubble) {
+                pipBubble.innerText = text;
+                pipBubble.style.display = 'block';
+            }
+        } else {
+            statusWindow.postMessage({ type: "BUBBLE_SHOW", text: text }, "*");
+        }
+    }
+};
+
+window.hideShortcutBubble = function() {
+    const bubble = document.getElementById('shortcut-bubble');
+    if (bubble) {
+        bubble.style.display = 'none';
+        bubble.innerText = '';
+    }
+
+    if (statusWindow && !statusWindow.closed) {
+        if (isPiPMode) {
+            const pipBubble = statusWindow.document.getElementById('pip-shortcut-bubble');
+            if (pipBubble) {
+                pipBubble.style.display = 'none';
+                pipBubble.innerText = '';
+            }
+        } else {
+            statusWindow.postMessage({ type: "BUBBLE_HIDE" }, "*");
+        }
+    }
+};
+
 document.addEventListener('keydown', (e) => {
     if (typeof isObserver !== 'undefined' && isObserver) return;
 
     // 若正在輸入文字，忽略快速鍵
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+    if (e.key.toLowerCase() === 'c') {
+        shortcutBuffer = [];
+        if (shortcutTimer) clearTimeout(shortcutTimer);
+        window.hideShortcutBubble();
+        return;
+    }
 
     if (e.key.toLowerCase() === 'p') {
         if (typeof isDetecting !== 'undefined' && isDetecting) {
@@ -232,15 +279,19 @@ document.addEventListener('keydown', (e) => {
 
         if (shortcutBuffer.length === 1) {
             // 第一位數：層數 (1-9 為第 1-9 層, 0 為第 10 層)
-            console.log(`快捷鍵輸入中: 層數 = ${digit === 0 ? 10 : digit}, 請輸入平台編號 (1-4)...`);
+            const rowStr = digit === 0 ? 10 : digit;
+            console.log(`快捷鍵輸入中: 層數 = ${rowStr}, 請輸入平台編號 (1-4)...`);
+            window.showShortcutBubble(`準備點選第 ${rowStr} 層，等待輸入 1~4 (按 C 取消)`);
 
             // 2 秒內沒輸入第二位則失效
             shortcutTimer = setTimeout(() => {
                 shortcutBuffer = [];
+                window.hideShortcutBubble();
                 console.log("快捷鍵輸入超時");
             }, 2000);
         }
         else if (shortcutBuffer.length === 2) {
+            window.hideShortcutBubble();
             // 第二位數：平台 (1-4)
             const rowDigit = shortcutBuffer[0];
             const colDigit = shortcutBuffer[1];
@@ -266,16 +317,168 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// --- 即時燈號視窗 (Popup Window) ---
+// --- 即時燈號視窗 (Popup Window / Document PiP) ---
 let statusWindow = null;
+let isPiPMode = false;
 
-function openStatusWindow() {
-    if (statusWindow && !statusWindow.closed) {
+function updatePiPStatusWindow(data, xData) {
+    if (!statusWindow || !isPiPMode) return;
+    const container = statusWindow.document.getElementById("grid");
+    if (!container) return;
+    container.innerHTML = "";
+    for (let r = 0; r < 10; r++) {
+        const row = statusWindow.document.createElement("div");
+        row.className = "row";
+        const lbl = statusWindow.document.createElement("div");
+        lbl.className = "label";
+        lbl.innerText = 10 - r;
+        row.appendChild(lbl);
+        for (let c = 0; c < 4; c++) {
+            const cell = statusWindow.document.createElement("div");
+            const val = data[r * 4 + c];
+            const xMask = xData ? (xData[r * 4 + c] || 0) : 0;
+            
+            if (val < 4) {
+                cell.className = "cell active-" + val;
+            } else if (xMask > 0) {
+                const players = [];
+                for (let i = 0; i < 4; i++) {
+                    if (xMask & (1 << i)) players.push(i);
+                }
+                if (players.length === 1) {
+                    cell.className = "cell active-" + players[0];
+                } else {
+                    let gradientStr = [];
+                    let step = 100 / players.length;
+                    for(let i=0; i<players.length; i++) {
+                        gradientStr.push(`var(--color-${players[i]}) ${i*step}% ${(i+1)*step}%`);
+                    }
+                    cell.className = "cell";
+                    cell.style.background = `linear-gradient(135deg, ${gradientStr.join(', ')})`;
+                    cell.style.boxShadow = `0 0 8px var(--color-${players[0]})`;
+                }
+                cell.innerHTML = "<div style='color:white; display:flex; align-items:center; justify-content:center; height:100%; font-size:16px; font-weight:bold;'>X</div>";
+            } else {
+                cell.className = "cell";
+            }
+            row.appendChild(cell);
+        }
+        container.appendChild(row);
+    }
+}
+
+async function openStatusWindow() {
+    if (statusWindow && isPiPMode) {
+        // 如果已經是 PiP 視窗，直接返回
+        return;
+    }
+    if (statusWindow && !isPiPMode && !statusWindow.closed) {
         statusWindow.focus();
         return;
     }
 
-    statusWindow = window.open("", "RJPQStatus", "width=300,height=450,menubar=no,toolbar=no,location=no,status=no");
+    if (window.documentPictureInPicture) {
+        try {
+            statusWindow = await window.documentPictureInPicture.requestWindow({
+                width: 320,
+                height: 450,
+            });
+            isPiPMode = true;
+
+            statusWindow.addEventListener("pagehide", () => {
+                statusWindow = null;
+                isPiPMode = false;
+            });
+
+            // 寫入樣式
+            const style = statusWindow.document.createElement('style');
+            style.textContent = `
+                body { background: #0f172a; color: white; font-family: sans-serif; padding: 10px; margin: 0; overflow: hidden; }
+                .grid { display: flex; flex-direction: column; gap: 4px; }
+                .row { display: flex; gap: 4px; align-items: center; }
+                .label { width: 20px; font-size: 10px; color: #64748b; text-align: right; }
+                .cell { flex: 1; height: 30px; border-radius: 4px; background: #334155; }
+                .cell.active-0 { background: #f87171; box-shadow: 0 0 8px #f87171; }
+                .cell.active-1 { background: #4ade80; box-shadow: 0 0 8px #4ade80; }
+                .cell.active-2 { background: #60a5fa; box-shadow: 0 0 8px #60a5fa; }
+                .cell.active-3 { background: #c084fc; box-shadow: 0 0 8px #c084fc; }
+                h3 { font-size: 14px; margin: 0 0 10px 0; color: #38bdf8; text-align: center; }
+            `;
+            statusWindow.document.head.appendChild(style);
+
+            const title = statusWindow.document.createElement('h3');
+            title.innerText = "即時燈號窗 (置頂)";
+            statusWindow.document.body.appendChild(title);
+
+            const grid = statusWindow.document.createElement('div');
+            grid.id = "grid";
+            grid.className = "grid";
+            statusWindow.document.body.appendChild(grid);
+
+            const pipBubble = statusWindow.document.createElement('div');
+            pipBubble.id = "pip-shortcut-bubble";
+            pipBubble.style.cssText = "display: none; background: rgba(56, 189, 248, 0.95); color: #0f172a; padding: 10px; border-radius: 8px; font-weight: bold; font-size: 14px; text-align: center; margin-top: 10px; box-shadow: 0 4px 10px rgba(56, 189, 248, 0.4);";
+            statusWindow.document.body.appendChild(pipBubble);
+
+            // 綁定快捷鍵
+            let sb = [];
+            let st = null;
+            statusWindow.addEventListener("keydown", (e) => {
+                if (e.key.toLowerCase() === "p") {
+                    if (typeof isDetecting !== "undefined" && isDetecting) {
+                        if (typeof togglePauseDetection === "function") togglePauseDetection();
+                    }
+                    return;
+                }
+                if (e.key.toLowerCase() === "r") {
+                    if (typeof requestReset === "function") requestReset();
+                    return;
+                }
+                if (e.key.toLowerCase() === "c") {
+                    sb = [];
+                    if (st) clearTimeout(st);
+                    if (typeof window.hideShortcutBubble === "function") window.hideShortcutBubble();
+                    return;
+                }
+            
+                const isDigit = /^[0-9]$/.test(e.key);
+                if (isDigit) {
+                    const digit = parseInt(e.key);
+                    sb.push(digit);
+                    if (st) clearTimeout(st);
+                    if (sb.length === 1) {
+                        const rowStr = digit === 0 ? 10 : digit;
+                        if (typeof window.showShortcutBubble === "function") window.showShortcutBubble(`準備點選第 ${rowStr} 層，等待輸入 1~4 (按 C 取消)`);
+                        st = setTimeout(() => { 
+                            sb = []; 
+                            if (typeof window.hideShortcutBubble === "function") window.hideShortcutBubble();
+                        }, 2000);
+                    } else if (sb.length === 2) {
+                        if (typeof window.hideShortcutBubble === "function") window.hideShortcutBubble();
+                        const rD = sb[0];
+                        const cD = sb[1];
+                        const rIdx = (rD === 0) ? 0 : (10 - rD);
+                        const cIdx = cD - 1;
+                        if (cD >= 1 && cD <= 4 && rIdx >= 0 && rIdx <= 9) {
+                            const targetIdx = rIdx * 4 + cIdx;
+                            simulatePlatformClick(targetIdx);
+                        }
+                        sb = [];
+                    }
+                }
+            });
+
+            // 初始同步一次
+            updatePiPStatusWindow(roomData, typeof xMarkData !== 'undefined' ? xMarkData : []);
+            return;
+        } catch (e) {
+            console.warn("無法開啟 Document PiP，退回普通視窗", e);
+            isPiPMode = false;
+        }
+    }
+
+    // fallback: 傳統 window.open
+    statusWindow = window.open("", "RJPQStatus", "width=320,height=450,menubar=no,toolbar=no,location=no,status=no");
     if (!statusWindow) {
         alert("請允許彈出視窗以啟動即時燈號窗。");
         return;
@@ -303,6 +506,7 @@ function openStatusWindow() {
         <body>
             <h3>即時燈號窗</h3>
             <div id="grid" class="grid"></div>
+            <div id="pip-shortcut-bubble" style="display: none; background: rgba(56, 189, 248, 0.95); color: #0f172a; padding: 10px; border-radius: 8px; font-weight: bold; font-size: 14px; text-align: center; margin-top: 10px; transition: opacity 0.2s; box-shadow: 0 4px 10px rgba(56, 189, 248, 0.4);"></div>
             <script>
                 function update(data, xData) {
                     const container = document.getElementById("grid");
@@ -347,7 +551,6 @@ function openStatusWindow() {
                         container.appendChild(row);
                     }
                 }
-                // 接收來自父視窗的訊息
                 let windowRoomData = [];
                 let windowXMarkData = [];
                 window.addEventListener("message", (e) => {
@@ -355,10 +558,21 @@ function openStatusWindow() {
                         windowRoomData = e.data.roomData;
                         windowXMarkData = e.data.xMarkData;
                         update(windowRoomData, windowXMarkData);
+                    } else if (e.data.type === "BUBBLE_SHOW") {
+                        const bubble = document.getElementById("pip-shortcut-bubble");
+                        if (bubble) {
+                            bubble.innerText = e.data.text;
+                            bubble.style.display = "block";
+                        }
+                    } else if (e.data.type === "BUBBLE_HIDE") {
+                        const bubble = document.getElementById("pip-shortcut-bubble");
+                        if (bubble) {
+                            bubble.style.display = "none";
+                            bubble.innerText = "";
+                        }
                     }
                 });
 
-                // 快捷鍵邏輯 (與母視窗同步)
                 let sb = [];
                 let st = null;
                 window.addEventListener("keydown", (e) => {
@@ -372,14 +586,33 @@ function openStatusWindow() {
                         if (typeof window.opener.requestReset === "function") window.opener.requestReset();
                         return;
                     }
+                    if (e.key.toLowerCase() === "c" && window.opener && !window.opener.closed) {
+                        sb = [];
+                        if (st) clearTimeout(st);
+                        if (typeof window.opener.hideShortcutBubble === "function") window.opener.hideShortcutBubble();
+                        return;
+                    }
                 
-                    if (e.key >= "0" && e.key <= "9") {
+                    const isDigit = /^[0-9]$/.test(e.key);
+                    if (isDigit) {
                         const digit = parseInt(e.key);
                         sb.push(digit);
                         if (st) clearTimeout(st);
                         if (sb.length === 1) {
-                            st = setTimeout(() => { sb = []; }, 2000);
+                            const rowStr = digit === 0 ? 10 : digit;
+                            if (window.opener && !window.opener.closed && typeof window.opener.showShortcutBubble === "function") {
+                                window.opener.showShortcutBubble(\`準備點選第 \${rowStr} 層，等待輸入 1~4 (按 C 取消)\`);
+                            }
+                            st = setTimeout(() => { 
+                                sb = []; 
+                                if (window.opener && !window.opener.closed && typeof window.opener.hideShortcutBubble === "function") {
+                                    window.opener.hideShortcutBubble();
+                                }
+                            }, 2000);
                         } else if (sb.length === 2) {
+                            if (window.opener && !window.opener.closed && typeof window.opener.hideShortcutBubble === "function") {
+                                window.opener.hideShortcutBubble();
+                            }
                             const rD = sb[0];
                             const cD = sb[1];
                             const rIdx = (rD === 0) ? 0 : (10 - rD);
@@ -401,7 +634,6 @@ function openStatusWindow() {
     statusWindow.document.write(html);
     statusWindow.document.close();
 
-    // 初始同步一次
     setTimeout(() => {
         statusWindow.postMessage({ type: "UPDATE", roomData: roomData, xMarkData: typeof xMarkData !== 'undefined' ? xMarkData : [] }, "*");
     }, 200);
@@ -411,7 +643,12 @@ function openStatusWindow() {
 const originalRenderPlatforms = renderPlatforms;
 renderPlatforms = function () {
     originalRenderPlatforms();
-    if (statusWindow && !statusWindow.closed) {
-        statusWindow.postMessage({ type: "UPDATE", roomData: roomData, xMarkData: typeof xMarkData !== 'undefined' ? xMarkData : [] }, "*");
+    if (statusWindow) {
+        if (isPiPMode) {
+            updatePiPStatusWindow(roomData, typeof xMarkData !== 'undefined' ? xMarkData : []);
+        } else if (!statusWindow.closed) {
+            statusWindow.postMessage({ type: "UPDATE", roomData: roomData, xMarkData: typeof xMarkData !== 'undefined' ? xMarkData : [] }, "*");
+        }
     }
 };
+
