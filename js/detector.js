@@ -405,32 +405,60 @@ function applyPathToRoom(playerColor, pathStr) {
     if (playerColor === -1) return;
 
     let changed = false;
+    const isX = typeof isXMarkMode !== 'undefined' ? isXMarkMode[playerColor] : false;
 
-    // 1. 僅清除該玩家自己現有的所有層數，不影響其他人
-    for (let i = 0; i < 40; i++) {
-        if (roomData[i] === playerColor) {
-            roomData[i] = 4;
-            changed = true;
+    if (isX) {
+        // 1. 僅清除該玩家自己現有的所有 X 標記
+        for (let i = 0; i < 40; i++) {
+            if (typeof xMarkData !== 'undefined' && (xMarkData[i] & (1 << playerColor))) {
+                xMarkData[i] &= ~(1 << playerColor);
+                changed = true;
+            }
         }
-    }
 
-    // 2. 套用新字串填入位置
-    for (let layer = 0; layer < pathStr.length && layer < 10; layer++) {
-        const col = parseInt(pathStr[layer], 10) - 1; // '1' 變 0
-        const row = 9 - layer;
-        const index = row * 4 + col;
+        // 2. 套用新字串填入 X 標記位置
+        for (let layer = 0; layer < pathStr.length && layer < 10; layer++) {
+            const col = parseInt(pathStr[layer], 10) - 1; // '1' 變 0
+            const row = 9 - layer;
+            const index = row * 4 + col;
 
-        // 只有這格目前是空的，才填寫，遇到別人的位置則不覆蓋
-        if (roomData[index] === 4) {
-            roomData[index] = playerColor;
-            changed = true;
+            // X標記不可覆蓋已經標記是正解的平台
+            // 只有在這格目前沒有正解標示 (roomData === 4) 時，才填入 X 標記
+            if (roomData[index] === 4) {
+                if (typeof xMarkData !== 'undefined') {
+                    xMarkData[index] |= (1 << playerColor);
+                    changed = true;
+                }
+            }
+        }
+    } else {
+        // 1. 一般模式：僅清除該玩家自己現有的所有正解標記，不影響其他人
+        for (let i = 0; i < 40; i++) {
+            if (roomData[i] === playerColor) {
+                roomData[i] = 4;
+                changed = true;
+            }
+        }
+
+        // 2. 套用新字串填入正解位置
+        for (let layer = 0; layer < pathStr.length && layer < 10; layer++) {
+            const col = parseInt(pathStr[layer], 10) - 1; // '1' 變 0
+            const row = 9 - layer;
+            const index = row * 4 + col;
+
+            // 只有這格目前沒有正解標記，才填寫，遇到別人的正解位置則不覆蓋
+            if (roomData[index] === 4) {
+                if (typeof xMarkData !== 'undefined') xMarkData[index] = 0; // 一般標記會清空這格的 X 標記
+                roomData[index] = playerColor;
+                changed = true;
+            }
         }
     }
 
     if (changed) {
         if (typeof renderPlatforms === 'function') renderPlatforms();
 
-        const payload = { type: 'FULL_SYNC', data: roomData };
+        const payload = { type: 'FULL_SYNC', data: roomData, xData: typeof xMarkData !== 'undefined' ? xMarkData : [] };
         if (isHost && typeof broadcast === 'function') {
             broadcast(payload);
         } else if (typeof hostConn !== 'undefined' && hostConn && hostConn.open) {

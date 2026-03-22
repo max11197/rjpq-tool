@@ -73,7 +73,7 @@ function setupAsHost(hostPeerId) {
         updatePeerCount();
 
         conn.on('open', () => {
-            conn.send({ type: 'INIT', data: roomData });
+            conn.send({ type: 'INIT', data: roomData, xData: typeof xMarkData !== 'undefined' ? xMarkData : [] });
         });
 
         conn.on('data', (data) => handleData(data, conn));
@@ -118,6 +118,9 @@ function handleData(payload, fromConn = null) {
             if (!Array.isArray(payload.data) || payload.data.length !== 40) return;
             if (!payload.data.every(v => Number.isInteger(v) && v >= 0 && v <= 4)) return;
             roomData = payload.data;
+            if (payload.xData && Array.isArray(payload.xData) && payload.xData.length === 40) {
+                if (typeof xMarkData !== 'undefined') xMarkData = payload.xData;
+            }
             renderPlatforms();
             break;
         case 'UPDATE':
@@ -125,24 +128,33 @@ function handleData(payload, fromConn = null) {
             if (!Number.isInteger(payload.index) || payload.index < 0 || payload.index > 39) return;
             if (!Number.isInteger(payload.value) || payload.value < 0 || payload.value > 4) return;
             roomData[payload.index] = payload.value;
+            if (payload.xValue !== undefined && typeof xMarkData !== 'undefined') {
+                xMarkData[payload.index] = payload.xValue;
+            }
             synchronizeColRules(payload.index, payload.value);
             renderPlatforms();
 
             if (isHost) {
-                broadcast({ type: 'UPDATE', index: payload.index, value: payload.value }, fromConn);
+                broadcast({ type: 'UPDATE', index: payload.index, value: payload.value, xValue: payload.xValue }, fromConn);
             }
             break;
         case 'RESET':
             roomData = Array(40).fill(4);
+            if (typeof xMarkData !== 'undefined') {
+                xMarkData.fill(0);
+            }
             renderPlatforms();
             if (isHost) broadcast({ type: 'RESET' }, fromConn);
             break;
         case 'FULL_SYNC':
             if (!Array.isArray(payload.data) || payload.data.length !== 40) return;
             roomData = [...payload.data];
+            if (payload.xData && Array.isArray(payload.xData) && payload.xData.length === 40) {
+                if (typeof xMarkData !== 'undefined') xMarkData = [...payload.xData];
+            }
             if (typeof renderPlatforms === 'function') renderPlatforms();
             if (isHost && typeof broadcast === 'function') {
-                broadcast({ type: 'FULL_SYNC', data: payload.data }, fromConn);
+                broadcast({ type: 'FULL_SYNC', data: payload.data, xData: payload.xData }, fromConn);
             }
             break;
         case 'FULL':

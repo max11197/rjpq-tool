@@ -4,6 +4,9 @@ let roomCode = urlParams.get("code");
 const isObserver = urlParams.get("obs") === "1";
 
 let roomData = Array(40).fill(4); // 40 個平台 (10x4)，預設顏色為 4 (灰色)
+let xMarkData = Array(40).fill(0); // 記錄各平台的X標記遮罩 (位元運算: 1=P1, 2=P2, 4=P3, 8=P4)
+let isXMarkMode = [false, false, false, false]; // 各玩家是否處於X標記模式
+
 let selectedColor = -1;
 let isHost = false;
 

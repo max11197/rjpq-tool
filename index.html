@@ -231,13 +231,35 @@
             </div>
         </div>
 
-        <div class="controls">
-            <button class="color-btn btn-0" id="btn0" onclick="setSelectedColor(0)">玩家 1 (101)</button>
-            <button class="color-btn btn-1" id="btn1" onclick="setSelectedColor(1)">玩家 2 (102)</button>
-            <button class="color-btn btn-2" id="btn2" onclick="setSelectedColor(2)">玩家 3 (103)</button>
-            <button class="color-btn btn-3" id="btn3" onclick="setSelectedColor(3)">玩家 4 (104)</button>
-            <button class="reset-btn" onclick="requestReset()">重設全部</button>
-            <button class="capture-btn" onclick="openStatusWindow()" title="開啟置頂小視窗，即使切換視窗也能看到目前狀態">開啟即時燈號窗</button>
+        <div class="controls" style="display: flex; gap: 15px; align-items: start; flex-wrap: wrap; justify-content: center;">
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 5px;">
+                <button class="color-btn btn-0" id="btn0" onclick="setSelectedColor(0)">玩家 1 (101)</button>
+                <label style="font-size: 0.8rem; color: #94a3b8; cursor: pointer;">
+                    <input type="checkbox" id="chkXMode0" onchange="toggleXMode(0)"> X標記模式
+                </label>
+            </div>
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 5px;">
+                <button class="color-btn btn-1" id="btn1" onclick="setSelectedColor(1)">玩家 2 (102)</button>
+                <label style="font-size: 0.8rem; color: #94a3b8; cursor: pointer;">
+                    <input type="checkbox" id="chkXMode1" onchange="toggleXMode(1)"> X標記模式
+                </label>
+            </div>
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 5px;">
+                <button class="color-btn btn-2" id="btn2" onclick="setSelectedColor(2)">玩家 3 (103)</button>
+                <label style="font-size: 0.8rem; color: #94a3b8; cursor: pointer;">
+                    <input type="checkbox" id="chkXMode2" onchange="toggleXMode(2)"> X標記模式
+                </label>
+            </div>
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 5px;">
+                <button class="color-btn btn-3" id="btn3" onclick="setSelectedColor(3)">玩家 4 (104)</button>
+                <label style="font-size: 0.8rem; color: #94a3b8; cursor: pointer;">
+                    <input type="checkbox" id="chkXMode3" onchange="toggleXMode(3)"> X標記模式
+                </label>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+                <button class="reset-btn" onclick="requestReset()">重設全部</button>
+                <button class="capture-btn" style="padding: 0.5rem 1rem;" onclick="openStatusWindow()" title="開啟置頂小視窗，即使切換視窗也能看到目前狀態">開啟即時燈號窗</button>
+            </div>
         </div>
 
         <div id="platforms" class="grid-container">
@@ -250,6 +272,10 @@
                 <div class="instruction-item">
                     <span class="key">0-9</span> 後接 <span class="key">1-4</span>
                     <p>網頁聚焦時，快速點亮特定層數與平台 (0 為第 10 層)</p>
+                </div>
+                <div class="instruction-item">
+                    <span class="key">X</span>
+                    <p>切換當前選中玩家的 X標記模式</p>
                 </div>
                 <div class="instruction-item">
                     <span class="key">P</span>

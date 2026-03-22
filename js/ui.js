@@ -20,12 +20,38 @@ function renderPlatforms() {
             const colNum = col + 1;
             const index = row * 4 + col;
             const val = roomData[index];
+            const xMask = typeof xMarkData !== 'undefined' ? (xMarkData[index] || 0) : 0;
 
             const cell = document.createElement("div");
-            cell.className = `platform-cell ${val < 4 ? 'active-' + val : ''}`;
-            cell.innerText = colNum;
+            cell.className = `platform-cell`;
             cell.dataset.index = index;
             cell.onclick = (e) => onPlatformClick(index);
+
+            if (val < 4) {
+                cell.classList.add(`active-${val}`);
+                cell.innerText = colNum;
+            } else if (xMask > 0) {
+                const players = [];
+                for (let i = 0; i < 4; i++) {
+                    if (xMask & (1 << i)) players.push(i);
+                }
+                if (players.length === 1) {
+                    cell.classList.add(`active-${players[0]}`);
+                } else {
+                    let gradientStr = [];
+                    let step = 100 / players.length;
+                    for(let i = 0; i < players.length; i++) {
+                        gradientStr.push(`var(--color-${players[i]}) ${i*step}% ${(i+1)*step}%`);
+                    }
+                    cell.style.background = `linear-gradient(135deg, ${gradientStr.join(', ')})`;
+                    cell.style.boxShadow = `0 0 12px var(--color-${players[0]})`;
+                    cell.style.color = "white";
+                    cell.style.border = "none";
+                }
+                cell.innerText = "X";
+            } else {
+                cell.innerText = colNum;
+            }
 
             wrapper.appendChild(cell);
         }
@@ -62,6 +88,14 @@ function setSelectedColor(idx) {
     renderPath();
 }
 
+function toggleXMode(idx) {
+    if (typeof isXMarkMode !== 'undefined') {
+        isXMarkMode[idx] = !isXMarkMode[idx];
+        const chk = document.getElementById('chkXMode' + idx);
+        if (chk) chk.checked = isXMarkMode[idx];
+    }
+}
+
 // 供 detector 自動化的點選邏輯 (不重新賦值 selectedColor 但傳入指定顏色)
 // 這邊將原有的 onPlatformClick 拆分，以便程式調用不會被 selectedColor 卡住
 function simulatePlatformClick(index, forceColor) {
@@ -72,22 +106,43 @@ function simulatePlatformClick(index, forceColor) {
         return;
     }
 
-    let newValue = 4;
-    if (roomData[index] === colorToUse) {
-        newValue = 4;
-    } else {
-        // 如果是使用者手動點擊才需要確認，程式自動點擊跳過確認
-        if (forceColor === undefined && roomData[index] !== 4 && !confirm("確定要覆蓋其他玩家的位置嗎？")) {
-            return;
+    const isX = typeof isXMarkMode !== 'undefined' ? isXMarkMode[colorToUse] : false;
+
+    if (isX) {
+        let currentX = typeof xMarkData !== 'undefined' ? (xMarkData[index] || 0) : 0;
+        let pBit = (1 << colorToUse);
+
+        if (currentX & pBit) {
+            if (typeof xMarkData !== 'undefined') xMarkData[index] = currentX & ~pBit;
+        } else {
+            if (roomData[index] !== 4) {
+                if (forceColor === undefined && !confirm("此平台已經有一般模式的正解標記，確定要用X標記覆蓋嗎？")) return;
+                roomData[index] = 4;
+            }
+            if (typeof xMarkData !== 'undefined') xMarkData[index] = currentX | pBit;
         }
-        newValue = colorToUse;
+    } else {
+        if (roomData[index] === colorToUse) {
+            roomData[index] = 4;
+        } else {
+            // 如果是使用者手動點擊才需要確認，程式自動點擊跳過確認
+            if (forceColor === undefined && roomData[index] !== 4 && !confirm("確定要覆蓋其他玩家的位置嗎？")) {
+                return;
+            }
+            roomData[index] = colorToUse;
+            if (typeof xMarkData !== 'undefined') xMarkData[index] = 0;
+        }
+        synchronizeColRules(index, colorToUse);
     }
 
-    roomData[index] = newValue;
-    synchronizeColRules(index, newValue);
     renderPlatforms();
 
-    const payload = { type: 'UPDATE', index: index, value: newValue };
+    const payload = { 
+        type: 'UPDATE', 
+        index: index, 
+        value: roomData[index],
+        xValue: typeof xMarkData !== 'undefined' ? xMarkData[index] : 0
+    };
     if (isHost) {
         broadcast(payload);
     } else if (typeof hostConn !== 'undefined' && hostConn && hostConn.open) {
@@ -146,6 +201,13 @@ document.addEventListener('keydown', (e) => {
     if (e.key.toLowerCase() === 'p') {
         if (typeof isDetecting !== 'undefined' && isDetecting) {
             if (typeof togglePauseDetection === 'function') togglePauseDetection();
+        }
+        return;
+    }
+
+    if (e.key.toLowerCase() === 'x') {
+        if (selectedColor !== -1) {
+            toggleXMode(selectedColor);
         }
         return;
     }
@@ -242,7 +304,7 @@ function openStatusWindow() {
             <h3>即時燈號窗</h3>
             <div id="grid" class="grid"></div>
             <script>
-                function update(data) {
+                function update(data, xData) {
                     const container = document.getElementById("grid");
                     container.innerHTML = "";
                     for (let r = 0; r < 10; r++) {
@@ -255,7 +317,31 @@ function openStatusWindow() {
                         for (let c = 0; c < 4; c++) {
                             const cell = document.createElement("div");
                             const val = data[r * 4 + c];
-                            cell.className = "cell" + (val < 4 ? " active-" + val : "");
+                            const xMask = xData ? (xData[r * 4 + c] || 0) : 0;
+                            
+                            if (val < 4) {
+                                cell.className = "cell active-" + val;
+                            } else if (xMask > 0) {
+                                const players = [];
+                                for (let i = 0; i < 4; i++) {
+                                    if (xMask & (1 << i)) players.push(i);
+                                }
+                                if (players.length === 1) {
+                                    cell.className = "cell active-" + players[0];
+                                } else {
+                                    let gradientStr = [];
+                                    let step = 100 / players.length;
+                                    for(let i=0; i<players.length; i++) {
+                                        gradientStr.push(\`var(--color-\${players[i]}) \${i*step}% \${(i+1)*step}%\`);
+                                    }
+                                    cell.className = "cell";
+                                    cell.style.background = \`linear-gradient(135deg, \${gradientStr.join(', ')})\`;
+                                    cell.style.boxShadow = \`0 0 8px var(--color-\${players[0]})\`;
+                                }
+                                cell.innerHTML = "<div style='color:white; display:flex; align-items:center; justify-content:center; height:100%; font-size:16px; font-weight:bold;'>X</div>";
+                            } else {
+                                cell.className = "cell";
+                            }
                             row.appendChild(cell);
                         }
                         container.appendChild(row);
@@ -263,10 +349,12 @@ function openStatusWindow() {
                 }
                 // 接收來自父視窗的訊息
                 let windowRoomData = [];
+                let windowXMarkData = [];
                 window.addEventListener("message", (e) => {
                     if (e.data.type === "UPDATE") {
                         windowRoomData = e.data.roomData;
-                        update(windowRoomData);
+                        windowXMarkData = e.data.xMarkData;
+                        update(windowRoomData, windowXMarkData);
                     }
                 });
 
@@ -315,7 +403,7 @@ function openStatusWindow() {
 
     // 初始同步一次
     setTimeout(() => {
-        statusWindow.postMessage({ type: "UPDATE", roomData: roomData }, "*");
+        statusWindow.postMessage({ type: "UPDATE", roomData: roomData, xMarkData: typeof xMarkData !== 'undefined' ? xMarkData : [] }, "*");
     }, 200);
 }
 
@@ -324,6 +412,6 @@ const originalRenderPlatforms = renderPlatforms;
 renderPlatforms = function () {
     originalRenderPlatforms();
     if (statusWindow && !statusWindow.closed) {
-        statusWindow.postMessage({ type: "UPDATE", roomData: roomData }, "*");
+        statusWindow.postMessage({ type: "UPDATE", roomData: roomData, xMarkData: typeof xMarkData !== 'undefined' ? xMarkData : [] }, "*");
     }
 };
