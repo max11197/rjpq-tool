@@ -1,6 +1,7 @@
 // --- 全域變數 ---
 const urlParams = new URLSearchParams(window.location.search);
 let roomCode = urlParams.get("code");
+let roomPwd = urlParams.get("pwd");
 const isObserver = urlParams.get("obs") === "1";
 
 let roomData = Array(40).fill(4); // 40 個平台 (10x4)，預設顏色為 4 (灰色)
@@ -21,7 +22,17 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById('roomInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') joinRoom();
         });
+        const pwdInput = document.getElementById('passwordInput');
+        if (pwdInput) {
+            pwdInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') joinRoom();
+            });
+        }
     } else {
+        if (roomPwd === null) {
+            roomPwd = prompt("請輸入房間密碼 (若無密碼請直接按確定留白):") || "";
+        }
+
         // 已有房號，顯示主介面並啟動
         document.getElementById('room-setup-overlay').style.display = 'none';
         document.getElementById('main-content').style.display = 'block';
@@ -33,7 +44,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (isObserver) {
             const controls = document.querySelector('.controls');
             if (controls) {
-                controls.innerHTML = `<button class="capture-btn" onclick="openStatusWindow()" title="開啟置頂小視窗">開啟即時燈號窗</button>`;
+                controls.style.display = 'none';
             }
             document.querySelectorAll('.ai-controls').forEach(el => el.style.display = 'none');
             document.querySelectorAll('.instruction-section').forEach(el => el.style.display = 'none');
@@ -48,7 +59,9 @@ document.addEventListener("DOMContentLoaded", () => {
 // 加入房間
 function joinRoom() {
     const input = document.getElementById('roomInput');
+    const pwdInput = document.getElementById('passwordInput');
     let code = input.value.trim();
+    let pwd = pwdInput ? pwdInput.value.trim() : "";
 
     if (!code) {
         showError("請輸入房間代碼");
@@ -59,24 +72,27 @@ function joinRoom() {
     code = filterRoomCode(code);
 
     if (!code) {
-        showError("房間代碼無效 (僅限英文字母與數字)");
+        showError("房間代碼無效 (僅限英文字母與數字及橫線)");
         return;
     }
 
     // 跳轉
     const obsChecked = document.getElementById('chkObserver').checked;
-    window.location.search = `?code=${encodeURIComponent(code)}` + (obsChecked ? "&obs=1" : "");
+    window.location.search = `?code=${encodeURIComponent(code)}&pwd=${encodeURIComponent(pwd)}` + (obsChecked ? "&obs=1" : "");
 }
 
 // 建立房間 (產生隨機 ID)
 function createRoom() {
-    const randomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-    window.location.search = `?code=${randomCode}`;
+    const pwdInput = document.getElementById('passwordInput');
+    const pwd = pwdInput ? pwdInput.value.trim() : "";
+    const randomCode = crypto.randomUUID();
+
+    window.location.search = `?code=${randomCode}&pwd=${encodeURIComponent(pwd)}`;
 }
 
-// 過濾房間代碼：只保留大小寫英文字母與數字
+// 過濾房間代碼：只保留大小寫英文字母與數字與-
 function filterRoomCode(code) {
-    return code.replace(/[^A-Za-z0-9]/g, "");
+    return code.replace(/[^A-Za-z0-9\-]/g, "");
 }
 
 function showError(msg) {

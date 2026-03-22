@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RJPQ 工具 (P2P 版)</title>
+    <title>RJPQ 工具</title>
     <!-- 引入 PeerJS 用於瀏覽器 P2P 通訊 -->
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
     <!-- 引入 Tesseract.js 用於純前端 OCR 辨識 -->
@@ -119,10 +119,13 @@
             <h1 class="setup-title">RJPQ 工具</h1>
             <p class="setup-subtitle">輸入房間代碼或建立新房間以開始</p>
 
-            <div class="input-group">
-                <input type="text" id="roomInput" placeholder="輸入房間代碼 (例如: 1234)" maxlength="20">
+            <div class="input-group" style="display: flex; flex-direction: column; gap: 10px;">
+                <input type="text" id="roomInput" placeholder="輸入房間代碼或建立新房間以開始" maxlength="50"
+                    style="padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--glass-border); background: rgba(0,0,0,0.3); color: white;">
+                <input type="password" id="passwordInput" placeholder="輸入房間密碼 (無密碼請留白)"
+                    style="padding: 0.75rem 1rem; border-radius: 8px; border: 1px solid var(--glass-border); background: rgba(0,0,0,0.3); color: white;">
                 <label
-                    style="color: #94a3b8; font-size: 0.9rem; margin-top: 15px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;">
+                    style="color: #94a3b8; font-size: 0.9rem; margin-top: 5px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;">
                     <input type="checkbox" id="chkObserver">
                     以觀察模式加入 (只看、不佔人數)
                 </label>
@@ -153,7 +156,6 @@
             style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
             <select id="resSelect" class="name-input"
                 style="min-width: 150px; background: rgba(0,0,0,0.5); border-radius: 8px;">
-                <option value="2560x1440">2560x1440</option>
                 <option value="1920x1080">1920x1080</option>
                 <option value="1680x1050">1680x1050</option>
                 <option value="1600x1200">1600x1200</option>
@@ -249,7 +251,8 @@
             </div>
         </div>
 
-        <div class="controls" style="display: flex; gap: 15px; align-items: start; flex-wrap: wrap; justify-content: center;">
+        <div class="controls"
+            style="display: flex; gap: 15px; align-items: start; flex-wrap: wrap; justify-content: center;">
             <div style="display: flex; flex-direction: column; align-items: center; gap: 5px;">
                 <button class="color-btn btn-0" id="btn0" onclick="setSelectedColor(0)">玩家 1 (101)</button>
                 <label style="font-size: 0.8rem; color: #94a3b8; cursor: pointer;">
@@ -276,7 +279,8 @@
             </div>
             <div style="display: flex; flex-direction: column; gap: 5px;">
                 <button class="reset-btn" onclick="requestReset()">重設全部</button>
-                <button class="capture-btn" style="padding: 0.5rem 1rem;" onclick="openStatusWindow()" title="開啟置頂小視窗，即使切換視窗也能看到目前狀態">開啟即時燈號窗</button>
+                <button class="capture-btn" style="padding: 0.5rem 1rem;" onclick="openStatusWindow()"
+                    title="開啟置頂小視窗，即使切換視窗也能看到目前狀態">開啟懸浮視窗</button>
             </div>
         </div>
 

@@ -25,7 +25,12 @@ function initP2P() {
 
 function tryToBeHost() {
     const hostPeerId = PEER_PREFIX + roomCode;
-    const conn = peer.connect(hostPeerId, { metadata: { isObserver: typeof isObserver !== 'undefined' ? isObserver : false } });
+    const conn = peer.connect(hostPeerId, {
+        metadata: {
+            isObserver: typeof isObserver !== 'undefined' ? isObserver : false,
+            password: typeof roomPwd !== 'undefined' ? roomPwd : ""
+        }
+    });
 
     let connectionTimeout = setTimeout(() => {
         if (!isHost && !hostConn) {
@@ -55,18 +60,18 @@ function setupAsHost(hostPeerId) {
     });
 
     peer.on('connection', (conn) => {
-        const isConnObserver = conn.metadata && conn.metadata.isObserver;
-        const playerCount = connections.filter(c => !(c.metadata && c.metadata.isObserver)).length;
-
-        // Host 算 1 位，最多只能再接受 3 位非觀看玩家，觀察者不佔位
-        if (!isConnObserver && playerCount >= 3) {
-            console.log("連線被拒絕: 玩家名額已滿 (4人)");
+        const connPwd = (conn.metadata && conn.metadata.password) || "";
+        const expectedPwd = typeof roomPwd !== 'undefined' ? roomPwd : "";
+        if (connPwd !== expectedPwd) {
+            console.log("連線被拒絕: 密碼錯誤");
             conn.on('open', () => {
-                conn.send({ type: 'FULL' });
+                conn.send({ type: 'WRONG_PWD' });
                 setTimeout(() => conn.close(), 500);
             });
             return;
         }
+
+        const isConnObserver = conn.metadata && conn.metadata.isObserver;
 
         console.log(`新參加者加入: ${conn.peer} (觀察者: ${!!isConnObserver})`);
         connections.push(conn);
@@ -159,8 +164,15 @@ function handleData(payload, fromConn = null) {
             break;
         case 'FULL':
             window.isRoomFullExited = true;
-            updateStatus("offline", "❌ 該房間已達 4 人上限，無法進入");
-            alert("該房間已滿 (上限 4 人)，請嘗試更換房號或聯繫管理員。");
+            updateStatus("offline", "❌ 該房間已達限制");
+            alert("該房間已滿，限制進入。");
+            if (hostConn) hostConn.close();
+            break;
+        case 'WRONG_PWD':
+            window.isRoomFullExited = true;
+            updateStatus("offline", "❌ 密碼錯誤，拒絕連線");
+            alert("房間密碼錯誤！");
+            window.location.href = "?";
             if (hostConn) hostConn.close();
             break;
     }

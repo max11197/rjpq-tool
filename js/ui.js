@@ -40,8 +40,8 @@ function renderPlatforms() {
                 } else {
                     let gradientStr = [];
                     let step = 100 / players.length;
-                    for(let i = 0; i < players.length; i++) {
-                        gradientStr.push(`var(--color-${players[i]}) ${i*step}% ${(i+1)*step}%`);
+                    for (let i = 0; i < players.length; i++) {
+                        gradientStr.push(`var(--color-${players[i]}) ${i * step}% ${(i + 1) * step}%`);
                     }
                     cell.style.background = `linear-gradient(135deg, ${gradientStr.join(', ')})`;
                     cell.style.boxShadow = `0 0 12px var(--color-${players[0]})`;
@@ -86,6 +86,7 @@ function setSelectedColor(idx) {
     if (targetBtn) targetBtn.classList.add('active');
 
     renderPath();
+    if (typeof syncPopupControls === 'function') syncPopupControls();
 }
 
 function toggleXMode(idx) {
@@ -93,16 +94,88 @@ function toggleXMode(idx) {
         isXMarkMode[idx] = !isXMarkMode[idx];
         const chk = document.getElementById('chkXMode' + idx);
         if (chk) chk.checked = isXMarkMode[idx];
+        if (typeof syncPopupControls === 'function') syncPopupControls();
+    }
+}
+
+function syncPopupControls() {
+    if (!statusWindow) return;
+    if (isPiPMode) {
+        const cArr = ["#f87171", "#4ade80", "#60a5fa", "#c084fc"];
+        for (let i = 0; i < 4; i++) {
+            const btn = statusWindow.document.getElementById('pip-btn' + i);
+            if (btn) {
+                if (i === selectedColor) btn.style.background = cArr[i];
+                else btn.style.background = "transparent";
+            }
+            const chk = statusWindow.document.getElementById('pip-chk' + i);
+            if (chk) chk.checked = !!isXMarkMode[i];
+        }
+    } else if (!statusWindow.closed) {
+        statusWindow.postMessage({ type: "SYNC_CONTROLS", selectedColor: selectedColor, isXMarkMode: isXMarkMode }, "*");
     }
 }
 
 // 供 detector 自動化的點選邏輯 (不重新賦值 selectedColor 但傳入指定顏色)
 // 這邊將原有的 onPlatformClick 拆分，以便程式調用不會被 selectedColor 卡住
-function simulatePlatformClick(index, forceColor) {
+function showCustomConfirm(msg, win = window) {
+    return new Promise(resolve => {
+        const doc = win.document;
+        const overlay = doc.createElement('div');
+        overlay.style.cssText = "position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 10000; font-family: sans-serif;";
+        const box = doc.createElement('div');
+        box.style.cssText = "background: #1e293b; border: 1px solid #38bdf8; padding: 20px; border-radius: 8px; text-align: center; color: white; max-width: 80%; box-shadow: 0 4px 15px rgba(0,0,0,0.8);";
+        const text = doc.createElement('div');
+        text.innerText = msg;
+        text.style.marginBottom = "20px";
+        text.style.fontSize = "14px";
+        text.style.lineHeight = "1.5";
+        const btnRow = doc.createElement('div');
+        btnRow.style.cssText = "display: flex; gap: 15px; justify-content: center;";
+        const btnYes = doc.createElement('button');
+        btnYes.innerText = "確定";
+        btnYes.style.cssText = "padding: 8px 16px; border-radius: 4px; border: none; background: #38bdf8; color: #0f172a; cursor: pointer; font-weight: bold; font-size: 14px;";
+        const btnNo = doc.createElement('button');
+        btnNo.innerText = "取消";
+        btnNo.style.cssText = "padding: 8px 16px; border-radius: 4px; border: 1px solid #94a3b8; background: transparent; color: #cbd5e1; cursor: pointer; font-size: 14px;";
+
+        const cleanup = () => {
+            win.removeEventListener('keydown', handleKeyDown, true);
+            overlay.remove();
+        };
+
+        const handleKeyDown = (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                cleanup();
+                resolve(true);
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                cleanup();
+                resolve(false);
+            }
+        };
+
+        btnYes.onclick = () => { cleanup(); resolve(true); };
+        btnNo.onclick = () => { cleanup(); resolve(false); };
+
+        btnRow.appendChild(btnYes);
+        btnRow.appendChild(btnNo);
+        box.appendChild(text);
+        box.appendChild(btnRow);
+        overlay.appendChild(box);
+        doc.body.appendChild(overlay);
+
+        win.addEventListener('keydown', handleKeyDown, true);
+        btnYes.focus();
+    });
+}
+
+async function simulatePlatformClick(index, forceColor, clickWindow = window) {
     let colorToUse = forceColor !== undefined ? forceColor : selectedColor;
 
     if (colorToUse === -1) {
-        alert("請先選擇一個玩家位置");
+        if (clickWindow.alert) clickWindow.alert("請先選擇一個玩家位置");
         return;
     }
 
@@ -116,7 +189,10 @@ function simulatePlatformClick(index, forceColor) {
             if (typeof xMarkData !== 'undefined') xMarkData[index] = currentX & ~pBit;
         } else {
             if (roomData[index] !== 4) {
-                if (forceColor === undefined && !confirm("此平台已經有一般模式的正解標記，確定要用X標記覆蓋嗎？")) return;
+                if (forceColor === undefined) {
+                    const ans = await showCustomConfirm("此平台已經有一般模式的正解標記，確定要用X標記覆蓋嗎？", clickWindow);
+                    if (!ans) return;
+                }
                 roomData[index] = 4;
             }
             if (typeof xMarkData !== 'undefined') xMarkData[index] = currentX | pBit;
@@ -126,8 +202,9 @@ function simulatePlatformClick(index, forceColor) {
             roomData[index] = 4;
         } else {
             // 如果是使用者手動點擊才需要確認，程式自動點擊跳過確認
-            if (forceColor === undefined && roomData[index] !== 4 && !confirm("確定要覆蓋其他玩家的位置嗎？")) {
-                return;
+            if (forceColor === undefined && roomData[index] !== 4) {
+                const ans = await showCustomConfirm("確定要覆蓋其他玩家的位置嗎？", clickWindow);
+                if (!ans) return;
             }
             roomData[index] = colorToUse;
             if (typeof xMarkData !== 'undefined') xMarkData[index] = 0;
@@ -137,9 +214,9 @@ function simulatePlatformClick(index, forceColor) {
 
     renderPlatforms();
 
-    const payload = { 
-        type: 'UPDATE', 
-        index: index, 
+    const payload = {
+        type: 'UPDATE',
+        index: index,
         value: roomData[index],
         xValue: typeof xMarkData !== 'undefined' ? xMarkData[index] : 0
     };
@@ -192,7 +269,7 @@ function updatePeerCount() {
 let shortcutBuffer = [];
 let shortcutTimer = null;
 
-window.showShortcutBubble = function(text) {
+window.showShortcutBubble = function (text) {
     const bubble = document.getElementById('shortcut-bubble');
     if (bubble) {
         bubble.innerText = text;
@@ -212,7 +289,7 @@ window.showShortcutBubble = function(text) {
     }
 };
 
-window.hideShortcutBubble = function() {
+window.hideShortcutBubble = function () {
     const bubble = document.getElementById('shortcut-bubble');
     if (bubble) {
         bubble.style.display = 'none';
@@ -335,9 +412,13 @@ function updatePiPStatusWindow(data, xData) {
         row.appendChild(lbl);
         for (let c = 0; c < 4; c++) {
             const cell = statusWindow.document.createElement("div");
-            const val = data[r * 4 + c];
-            const xMask = xData ? (xData[r * 4 + c] || 0) : 0;
-            
+            const index = r * 4 + c;
+            cell.onclick = () => {
+                if (typeof simulatePlatformClick === 'function') simulatePlatformClick(index, undefined, statusWindow);
+            };
+            const val = data[index];
+            const xMask = xData ? (xData[index] || 0) : 0;
+
             if (val < 4) {
                 cell.className = "cell active-" + val;
             } else if (xMask > 0) {
@@ -350,8 +431,8 @@ function updatePiPStatusWindow(data, xData) {
                 } else {
                     let gradientStr = [];
                     let step = 100 / players.length;
-                    for(let i=0; i<players.length; i++) {
-                        gradientStr.push(`var(--color-${players[i]}) ${i*step}% ${(i+1)*step}%`);
+                    for (let i = 0; i < players.length; i++) {
+                        gradientStr.push(`var(--color-${players[i]}) ${i * step}% ${(i + 1) * step}%`);
                     }
                     cell.className = "cell";
                     cell.style.background = `linear-gradient(135deg, ${gradientStr.join(', ')})`;
@@ -368,6 +449,10 @@ function updatePiPStatusWindow(data, xData) {
 }
 
 async function openStatusWindow() {
+    if (typeof isObserver !== 'undefined' && isObserver) {
+        return; // 觀察模式無效
+    }
+
     if (statusWindow && isPiPMode) {
         // 如果已經是 PiP 視窗，直接返回
         return;
@@ -381,7 +466,7 @@ async function openStatusWindow() {
         try {
             statusWindow = await window.documentPictureInPicture.requestWindow({
                 width: 320,
-                height: 450,
+                height: 520,
             });
             isPiPMode = true;
 
@@ -397,7 +482,7 @@ async function openStatusWindow() {
                 .grid { display: flex; flex-direction: column; gap: 4px; }
                 .row { display: flex; gap: 4px; align-items: center; }
                 .label { width: 20px; font-size: 10px; color: #64748b; text-align: right; }
-                .cell { flex: 1; height: 30px; border-radius: 4px; background: #334155; }
+                .cell { flex: 1; height: 30px; border-radius: 4px; background: #334155; cursor: pointer; }
                 .cell.active-0 { background: #f87171; box-shadow: 0 0 8px #f87171; }
                 .cell.active-1 { background: #4ade80; box-shadow: 0 0 8px #4ade80; }
                 .cell.active-2 { background: #60a5fa; box-shadow: 0 0 8px #60a5fa; }
@@ -407,8 +492,36 @@ async function openStatusWindow() {
             statusWindow.document.head.appendChild(style);
 
             const title = statusWindow.document.createElement('h3');
-            title.innerText = "即時燈號窗 (置頂)";
+            title.innerText = "懸浮視窗";
             statusWindow.document.body.appendChild(title);
+
+            const controls = statusWindow.document.createElement('div');
+            controls.style.cssText = "display: flex; gap: 4px; justify-content: center; margin-bottom: 10px;";
+            for (let i = 0; i < 4; i++) {
+                const pDiv = statusWindow.document.createElement('div');
+                pDiv.style.cssText = "display: flex; flex-direction: column; align-items: center; gap: 2px;";
+                const btn = statusWindow.document.createElement('button');
+                btn.id = "pip-btn" + i;
+                btn.innerText = `P${i + 1}`;
+                const cArr = ["#f87171", "#4ade80", "#60a5fa", "#c084fc"];
+                btn.style.cssText = `padding: 2px 6px; border-radius: 4px; border: 1px solid ${cArr[i]}; background: transparent; color: white; cursor: pointer; font-size: 12px; transition: background 0.2s;`;
+                btn.onclick = () => {
+                    setSelectedColor(i);
+                };
+                const lbl = statusWindow.document.createElement('label');
+                lbl.style.cssText = "font-size: 10px; color: #94a3b8; cursor: pointer; display: flex; align-items: center;";
+                const chk = statusWindow.document.createElement('input');
+                chk.type = "checkbox";
+                chk.id = "pip-chk" + i;
+                chk.checked = typeof isXMarkMode !== 'undefined' ? !!isXMarkMode[i] : false;
+                chk.onchange = () => toggleXMode(i);
+                lbl.appendChild(chk);
+                lbl.appendChild(statusWindow.document.createTextNode("X標記"));
+                pDiv.appendChild(btn);
+                pDiv.appendChild(lbl);
+                controls.appendChild(pDiv);
+            }
+            statusWindow.document.body.appendChild(controls);
 
             const grid = statusWindow.document.createElement('div');
             grid.id = "grid";
@@ -440,7 +553,13 @@ async function openStatusWindow() {
                     if (typeof window.hideShortcutBubble === "function") window.hideShortcutBubble();
                     return;
                 }
-            
+                if (e.key.toLowerCase() === "x") {
+                    if (typeof selectedColor !== "undefined" && selectedColor !== -1) {
+                        if (typeof toggleXMode === "function") toggleXMode(selectedColor);
+                    }
+                    return;
+                }
+
                 const isDigit = /^[0-9]$/.test(e.key);
                 if (isDigit) {
                     const digit = parseInt(e.key);
@@ -449,8 +568,8 @@ async function openStatusWindow() {
                     if (sb.length === 1) {
                         const rowStr = digit === 0 ? 10 : digit;
                         if (typeof window.showShortcutBubble === "function") window.showShortcutBubble(`準備點選第 ${rowStr} 層，等待輸入 1~4 (按 C 取消)`);
-                        st = setTimeout(() => { 
-                            sb = []; 
+                        st = setTimeout(() => {
+                            sb = [];
                             if (typeof window.hideShortcutBubble === "function") window.hideShortcutBubble();
                         }, 2000);
                     } else if (sb.length === 2) {
@@ -461,7 +580,7 @@ async function openStatusWindow() {
                         const cIdx = cD - 1;
                         if (cD >= 1 && cD <= 4 && rIdx >= 0 && rIdx <= 9) {
                             const targetIdx = rIdx * 4 + cIdx;
-                            simulatePlatformClick(targetIdx);
+                            simulatePlatformClick(targetIdx, undefined, statusWindow);
                         }
                         sb = [];
                     }
@@ -470,6 +589,7 @@ async function openStatusWindow() {
 
             // 初始同步一次
             updatePiPStatusWindow(roomData, typeof xMarkData !== 'undefined' ? xMarkData : []);
+            if (typeof syncPopupControls === 'function') syncPopupControls();
             return;
         } catch (e) {
             console.warn("無法開啟 Document PiP，退回普通視窗", e);
@@ -478,7 +598,7 @@ async function openStatusWindow() {
     }
 
     // fallback: 傳統 window.open
-    statusWindow = window.open("", "RJPQStatus", "width=320,height=450,menubar=no,toolbar=no,location=no,status=no");
+    statusWindow = window.open("", "RJPQStatus", "width=320,height=520,menubar=no,toolbar=no,location=no,status=no");
     if (!statusWindow) {
         alert("請允許彈出視窗以啟動即時燈號窗。");
         return;
@@ -489,13 +609,21 @@ async function openStatusWindow() {
         <html>
         <head>
             <meta charset="UTF-8">
-            <title>RJPQ 即時燈號</title>
+            <title>RJPQ 懸浮視窗</title>
             <style>
                 body { background: #0f172a; color: white; font-family: sans-serif; padding: 10px; margin: 0; overflow: hidden; }
                 .grid { display: flex; flex-direction: column; gap: 4px; }
                 .row { display: flex; gap: 4px; align-items: center; }
                 .label { width: 20px; font-size: 10px; color: #64748b; text-align: right; }
-                .cell { flex: 1; height: 30px; border-radius: 4px; background: #334155; }
+                .cell { flex: 1; height: 30px; border-radius: 4px; background: #334155; cursor: pointer; }
+                .controls-row { display: flex; gap: 4px; justify-content: center; margin-bottom: 10px; }
+                .p-col { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+                .p-btn { padding: 2px 6px; border-radius: 4px; border: 1px solid #64748b; background: transparent; color: white; cursor: pointer; font-size: 12px; }
+                .p-btn.active { background: #64748b; }
+                .p-btn.c0 { border-color: #f87171; } .p-btn.active.c0 { background: #f87171; }
+                .p-btn.c1 { border-color: #4ade80; } .p-btn.active.c1 { background: #4ade80; }
+                .p-btn.c2 { border-color: #60a5fa; } .p-btn.active.c2 { background: #60a5fa; }
+                .p-btn.c3 { border-color: #c084fc; } .p-btn.active.c3 { background: #c084fc; }
                 .cell.active-0 { background: #f87171; box-shadow: 0 0 8px #f87171; }
                 .cell.active-1 { background: #4ade80; box-shadow: 0 0 8px #4ade80; }
                 .cell.active-2 { background: #60a5fa; box-shadow: 0 0 8px #60a5fa; }
@@ -504,7 +632,13 @@ async function openStatusWindow() {
             </style>
         </head>
         <body>
-            <h3>即時燈號窗</h3>
+            <h3>懸浮視窗</h3>
+            <div class="controls-row" id="pip-controls">
+                <div class="p-col"><button class="p-btn c0" id="pip-btn0" onclick="window.opener && window.opener.setSelectedColor(0)">P1</button><label style="font-size:10px;color:#94a3b8;"><input type="checkbox" id="pip-chk0" onchange="window.opener && window.opener.toggleXMode(0)"> X標記</label></div>
+                <div class="p-col"><button class="p-btn c1" id="pip-btn1" onclick="window.opener && window.opener.setSelectedColor(1)">P2</button><label style="font-size:10px;color:#94a3b8;"><input type="checkbox" id="pip-chk1" onchange="window.opener && window.opener.toggleXMode(1)"> X標記</label></div>
+                <div class="p-col"><button class="p-btn c2" id="pip-btn2" onclick="window.opener && window.opener.setSelectedColor(2)">P3</button><label style="font-size:10px;color:#94a3b8;"><input type="checkbox" id="pip-chk2" onchange="window.opener && window.opener.toggleXMode(2)"> X標記</label></div>
+                <div class="p-col"><button class="p-btn c3" id="pip-btn3" onclick="window.opener && window.opener.setSelectedColor(3)">P4</button><label style="font-size:10px;color:#94a3b8;"><input type="checkbox" id="pip-chk3" onchange="window.opener && window.opener.toggleXMode(3)"> X標記</label></div>
+            </div>
             <div id="grid" class="grid"></div>
             <div id="pip-shortcut-bubble" style="display: none; background: rgba(56, 189, 248, 0.95); color: #0f172a; padding: 10px; border-radius: 8px; font-weight: bold; font-size: 14px; text-align: center; margin-top: 10px; transition: opacity 0.2s; box-shadow: 0 4px 10px rgba(56, 189, 248, 0.4);"></div>
             <script>
@@ -520,8 +654,10 @@ async function openStatusWindow() {
                         row.appendChild(lbl);
                         for (let c = 0; c < 4; c++) {
                             const cell = document.createElement("div");
-                            const val = data[r * 4 + c];
-                            const xMask = xData ? (xData[r * 4 + c] || 0) : 0;
+                            const index = r * 4 + c;
+                            cell.onclick = () => window.opener && window.opener.simulatePlatformClick(index, undefined, window);
+                            const val = data[index];
+                            const xMask = xData ? (xData[index] || 0) : 0;
                             
                             if (val < 4) {
                                 cell.className = "cell active-" + val;
@@ -551,6 +687,7 @@ async function openStatusWindow() {
                         container.appendChild(row);
                     }
                 }
+
                 let windowRoomData = [];
                 let windowXMarkData = [];
                 window.addEventListener("message", (e) => {
@@ -569,6 +706,16 @@ async function openStatusWindow() {
                         if (bubble) {
                             bubble.style.display = "none";
                             bubble.innerText = "";
+                        }
+                    } else if (e.data.type === "SYNC_CONTROLS") {
+                        for(let i=0; i<4; i++) {
+                            const btn = document.getElementById('pip-btn' + i);
+                            if(btn) {
+                                if(i === e.data.selectedColor) btn.classList.add('active');
+                                else btn.classList.remove('active');
+                            }
+                            const chk = document.getElementById('pip-chk' + i);
+                            if(chk) chk.checked = e.data.isXMarkMode[i];
                         }
                     }
                 });
@@ -590,6 +737,12 @@ async function openStatusWindow() {
                         sb = [];
                         if (st) clearTimeout(st);
                         if (typeof window.opener.hideShortcutBubble === "function") window.opener.hideShortcutBubble();
+                        return;
+                    }
+                    if (e.key.toLowerCase() === "x" && window.opener && !window.opener.closed) {
+                        if (typeof window.opener.selectedColor !== "undefined" && window.opener.selectedColor !== -1) {
+                            if (typeof window.opener.toggleXMode === "function") window.opener.toggleXMode(window.opener.selectedColor);
+                        }
                         return;
                     }
                 
@@ -620,7 +773,7 @@ async function openStatusWindow() {
                             if (cD >= 1 && cD <= 4 && rIdx >= 0 && rIdx <= 9) {
                                 const targetIdx = rIdx * 4 + cIdx;
                                 if (window.opener && !window.opener.closed) {
-                                    window.opener.simulatePlatformClick(targetIdx);
+                                    window.opener.simulatePlatformClick(targetIdx, undefined, window);
                                 }
                             }
                             sb = [];
@@ -636,6 +789,7 @@ async function openStatusWindow() {
 
     setTimeout(() => {
         statusWindow.postMessage({ type: "UPDATE", roomData: roomData, xMarkData: typeof xMarkData !== 'undefined' ? xMarkData : [] }, "*");
+        if (typeof syncPopupControls === 'function') syncPopupControls();
     }, 200);
 }
 
