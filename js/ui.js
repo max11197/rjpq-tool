@@ -25,7 +25,15 @@ function renderPlatforms() {
             const cell = document.createElement("div");
             cell.className = `platform-cell`;
             cell.dataset.index = index;
-            cell.onclick = (e) => onPlatformClick(index);
+
+            // 加入滑鼠事件用於長按偵測
+            cell.onmousedown = (e) => handlePlatformMouseDown(e, index);
+            cell.onmouseup = (e) => handlePlatformMouseUp(e, index);
+            cell.onmouseleave = (e) => handlePlatformMouseLeave(e, index);
+            cell.onclick = (e) => {
+                if (longPressActive) return; // 如果是長按誘發的，不觸發普通點擊
+                onPlatformClick(index);
+            };
 
             if (val < 4) {
                 cell.classList.add(`active-${val}`);
@@ -101,11 +109,14 @@ function toggleXMode(idx) {
 function syncPopupControls() {
     if (!statusWindow) return;
     if (isPiPMode) {
-        const cArr = ["#f87171", "#4ade80", "#60a5fa", "#c084fc"];
+        const colors = [];
+        for (let j = 0; j < 4; j++) {
+            colors.push(getComputedStyle(document.documentElement).getPropertyValue(`--color-${j}`).trim());
+        }
         for (let i = 0; i < 4; i++) {
             const btn = statusWindow.document.getElementById('pip-btn' + i);
             if (btn) {
-                if (i === selectedColor) btn.style.background = cArr[i];
+                if (i === selectedColor) btn.style.background = colors[i];
                 else btn.style.background = "transparent";
             }
             const chk = statusWindow.document.getElementById('pip-chk' + i);
@@ -315,28 +326,37 @@ document.addEventListener('keydown', (e) => {
     // 若正在輸入文字，忽略快速鍵
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
-    if (e.key.toLowerCase() === 'c') {
+    const key = e.key.toLowerCase();
+
+    if (key === 'c') {
         shortcutBuffer = [];
         if (shortcutTimer) clearTimeout(shortcutTimer);
         window.hideShortcutBubble();
         return;
     }
 
-    if (e.key.toLowerCase() === 'p') {
+
+    if (['a', 's', 'd', 'f'].includes(key)) {
+        const idx = ['a', 's', 'd', 'f'].indexOf(key);
+        setSelectedColor(idx);
+        return;
+    }
+
+    if (key === 'p') {
         if (typeof isDetecting !== 'undefined' && isDetecting) {
             if (typeof togglePauseDetection === 'function') togglePauseDetection();
         }
         return;
     }
 
-    if (e.key.toLowerCase() === 'x') {
+    if (key === 'x') {
         if (selectedColor !== -1) {
             toggleXMode(selectedColor);
         }
         return;
     }
 
-    if (e.key.toLowerCase() === 'r') {
+    if (key === 'r') {
         if (typeof requestReset === 'function') requestReset();
         return;
     }
@@ -465,7 +485,7 @@ async function openStatusWindow() {
     if (window.documentPictureInPicture) {
         try {
             statusWindow = await window.documentPictureInPicture.requestWindow({
-                width: 320,
+                width: 300,
                 height: 520,
             });
             isPiPMode = true;
@@ -475,18 +495,24 @@ async function openStatusWindow() {
                 isPiPMode = false;
             });
 
-            // 寫入樣式
+            // 寫入變數與樣式
             const style = statusWindow.document.createElement('style');
             style.textContent = `
+                :root {
+                    --color-0: #f87171;
+                    --color-1: #4ade80;
+                    --color-2: #60a5fa;
+                    --color-3: #c084fc;
+                }
                 body { background: #0f172a; color: white; font-family: sans-serif; padding: 10px; margin: 0; overflow: hidden; }
                 .grid { display: flex; flex-direction: column; gap: 4px; }
                 .row { display: flex; gap: 4px; align-items: center; }
                 .label { width: 20px; font-size: 10px; color: #64748b; text-align: right; }
                 .cell { flex: 1; height: 30px; border-radius: 4px; background: #334155; cursor: pointer; }
-                .cell.active-0 { background: #f87171; box-shadow: 0 0 8px #f87171; }
-                .cell.active-1 { background: #4ade80; box-shadow: 0 0 8px #4ade80; }
-                .cell.active-2 { background: #60a5fa; box-shadow: 0 0 8px #60a5fa; }
-                .cell.active-3 { background: #c084fc; box-shadow: 0 0 8px #c084fc; }
+                .cell.active-0 { background: var(--color-0, #f87171); box-shadow: 0 0 8px var(--color-0, #f87171); }
+                .cell.active-1 { background: var(--color-1, #4ade80); box-shadow: 0 0 8px var(--color-1, #4ade80); }
+                .cell.active-2 { background: var(--color-2, #60a5fa); box-shadow: 0 0 8px var(--color-2, #60a5fa); }
+                .cell.active-3 { background: var(--color-3, #c084fc); box-shadow: 0 0 8px var(--color-3, #c084fc); }
                 h3 { font-size: 14px; margin: 0 0 10px 0; color: #38bdf8; text-align: center; }
             `;
             statusWindow.document.head.appendChild(style);
@@ -560,6 +586,13 @@ async function openStatusWindow() {
                     return;
                 }
 
+                const key = e.key.toLowerCase();
+                if (['a', 's', 'd', 'f'].includes(key)) {
+                    const idx = ['a', 's', 'd', 'f'].indexOf(key);
+                    if (typeof setSelectedColor === "function") setSelectedColor(idx);
+                    return;
+                }
+
                 const isDigit = /^[0-9]$/.test(e.key);
                 if (isDigit) {
                     const digit = parseInt(e.key);
@@ -587,6 +620,10 @@ async function openStatusWindow() {
                 }
             });
 
+            statusWindow.addEventListener("load", () => {
+                syncPopupColors();
+            });
+
             // 初始同步一次
             updatePiPStatusWindow(roomData, typeof xMarkData !== 'undefined' ? xMarkData : []);
             if (typeof syncPopupControls === 'function') syncPopupControls();
@@ -598,10 +635,16 @@ async function openStatusWindow() {
     }
 
     // fallback: 傳統 window.open
-    statusWindow = window.open("", "RJPQStatus", "width=320,height=520,menubar=no,toolbar=no,location=no,status=no");
+    statusWindow = window.open("", "RJPQStatus", "width=300,height=520,menubar=no,toolbar=no,location=no,status=no");
     if (!statusWindow) {
         alert("請允許彈出視窗以啟動即時燈號窗。");
         return;
+    }
+
+    const currentColors = [];
+    for (let i = 0; i < 4; i++) {
+        const c = getComputedStyle(document.documentElement).getPropertyValue(`--color-${i}`).trim();
+        currentColors.push(c || colorTemplates['standard'][i]);
     }
 
     const html = `
@@ -611,6 +654,12 @@ async function openStatusWindow() {
             <meta charset="UTF-8">
             <title>RJPQ 懸浮視窗</title>
             <style>
+                :root {
+                    --color-0: ${currentColors[0]};
+                    --color-1: ${currentColors[1]};
+                    --color-2: ${currentColors[2]};
+                    --color-3: ${currentColors[3]};
+                }
                 body { background: #0f172a; color: white; font-family: sans-serif; padding: 10px; margin: 0; overflow: hidden; }
                 .grid { display: flex; flex-direction: column; gap: 4px; }
                 .row { display: flex; gap: 4px; align-items: center; }
@@ -623,11 +672,11 @@ async function openStatusWindow() {
                 .p-btn.c0 { border-color: #f87171; } .p-btn.active.c0 { background: #f87171; }
                 .p-btn.c1 { border-color: #4ade80; } .p-btn.active.c1 { background: #4ade80; }
                 .p-btn.c2 { border-color: #60a5fa; } .p-btn.active.c2 { background: #60a5fa; }
-                .p-btn.c3 { border-color: #c084fc; } .p-btn.active.c3 { background: #c084fc; }
-                .cell.active-0 { background: #f87171; box-shadow: 0 0 8px #f87171; }
-                .cell.active-1 { background: #4ade80; box-shadow: 0 0 8px #4ade80; }
-                .cell.active-2 { background: #60a5fa; box-shadow: 0 0 8px #60a5fa; }
-                .cell.active-3 { background: #c084fc; box-shadow: 0 0 8px #c084fc; }
+                .p-btn.c3 { border-color: var(--color-3); } .p-btn.active.c3 { background: var(--color-3); }
+                .cell.active-0 { background: var(--color-0); box-shadow: 0 0 8px var(--color-0); }
+                .cell.active-1 { background: var(--color-1); box-shadow: 0 0 8px var(--color-1); }
+                .cell.active-2 { background: var(--color-2); box-shadow: 0 0 8px var(--color-2); }
+                .cell.active-3 { background: var(--color-3); box-shadow: 0 0 8px var(--color-3); }
                 h3 { font-size: 14px; margin: 0 0 10px 0; color: #38bdf8; text-align: center; }
             </style>
         </head>
@@ -717,36 +766,58 @@ async function openStatusWindow() {
                             const chk = document.getElementById('pip-chk' + i);
                             if(chk) chk.checked = e.data.isXMarkMode[i];
                         }
+                    } else if (e.data.type === "COLOR_UPDATE") {
+                        e.data.colors.forEach((c, i) => {
+                            document.documentElement.style.setProperty("--color-" + i, c);
+                            const btn = document.getElementById('pip-btn' + i);
+                            if (btn) btn.style.borderColor = c;
+                        });
                     }
                 });
 
                 let sb = [];
                 let st = null;
                 window.addEventListener("keydown", (e) => {
-                    if (e.key.toLowerCase() === "p" && window.opener && !window.opener.closed) {
+                    const key = e.key.toLowerCase();
+
+                    if (!window.opener || window.opener.closed) {
+                        return;
+                    }
+
+                    if (key === "p") {
                         if (typeof window.opener.isDetecting !== "undefined" && window.opener.isDetecting) {
                             if (typeof window.opener.togglePauseDetection === "function") window.opener.togglePauseDetection();
                         }
                         return;
                     }
-                    if (e.key.toLowerCase() === "r" && window.opener && !window.opener.closed) {
+
+                    if (key === "r") {
                         if (typeof window.opener.requestReset === "function") window.opener.requestReset();
                         return;
                     }
-                    if (e.key.toLowerCase() === "c" && window.opener && !window.opener.closed) {
+
+                    if (key === "c") {
                         sb = [];
                         if (st) clearTimeout(st);
                         if (typeof window.opener.hideShortcutBubble === "function") window.opener.hideShortcutBubble();
                         return;
                     }
-                    if (e.key.toLowerCase() === "x" && window.opener && !window.opener.closed) {
+
+                    if (key === 'x') {
                         if (typeof window.opener.selectedColor !== "undefined" && window.opener.selectedColor !== -1) {
                             if (typeof window.opener.toggleXMode === "function") window.opener.toggleXMode(window.opener.selectedColor);
                         }
                         return;
                     }
+
+                    if (['a', 's', 'd', 'f'].includes(key)) {
+                        const idx = ['a', 's', 'd', 'f'].indexOf(key);
+                        if (window.opener && window.opener.setSelectedColor) window.opener.setSelectedColor(idx);
+                        return;
+                    }
                 
                     const isDigit = /^[0-9]$/.test(e.key);
+
                     if (isDigit) {
                         const digit = parseInt(e.key);
                         sb.push(digit);
@@ -793,7 +864,7 @@ async function openStatusWindow() {
     }, 200);
 }
 
-// 修改 renderPlatforms 最後一行以同步彈出視窗
+// 修改 renderPlatforms 以同步彈出視窗/PiP
 const originalRenderPlatforms = renderPlatforms;
 renderPlatforms = function () {
     originalRenderPlatforms();
@@ -805,4 +876,189 @@ renderPlatforms = function () {
         }
     }
 };
+
+function copyRoomCode() {
+    const code = document.getElementById('roomCodeDisplay').innerText;
+    if (code === '------') return;
+
+    navigator.clipboard.writeText(code).then(() => {
+        const label = document.querySelector('.room-label');
+        const originalText = label.innerText;
+        label.innerText = "已複製！";
+        label.style.color = "#4ade80";
+        setTimeout(() => {
+            label.innerText = originalText;
+            label.style.color = "";
+        }, 1500);
+    }).catch(err => {
+        console.error('無法複製房號: ', err);
+    });
+}
+
+// --- 顏色與無障礙功能 ---
+function openColorSettings() {
+    document.getElementById('color-settings-modal').style.display = 'flex';
+    // 初始化 Pickers
+    const styles = getComputedStyle(document.documentElement);
+    for (let i = 0; i < 4; i++) {
+        const color = styles.getPropertyValue(`--color-${i}`).trim();
+        if (color) document.getElementById(`color-picker-${i}`).value = color;
+    }
+}
+
+function closeColorSettings() {
+    document.getElementById('color-settings-modal').style.display = 'none';
+}
+
+const colorTemplates = {
+    'standard': ['#f87171', '#4ade80', '#60a5fa', '#c084fc'],
+    'protanopia': ['#9ea160', '#9ea160', '#60a5fa', '#c084fc'],
+    'deuteranopia': ['#a29d66', '#a29d66', '#60a5fa', '#c084fc'],
+    'tritanopia': ['#f87171', '#00b1b9', '#00b1b9', '#c084fc']
+};
+
+function setColorTemplate(type) {
+    const colors = colorTemplates[type] || colorTemplates['standard'];
+    for (let i = 0; i < 4; i++) {
+        document.getElementById(`color-picker-${i}`).value = colors[i];
+    }
+}
+
+function applyColors() {
+    for (let i = 0; i < 4; i++) {
+        const color = document.getElementById(`color-picker-${i}`).value;
+        document.documentElement.style.setProperty(`--color-${i}`, color);
+
+        // 同步更新玩家按鈕背景
+        const btn = document.getElementById('btn' + i);
+        if (btn) btn.style.backgroundColor = color;
+    }
+
+    // 同步到懸浮視窗
+    syncPopupColors();
+    renderPlatforms();
+    closeColorSettings();
+}
+
+function syncPopupColors() {
+    if (!statusWindow) return;
+    const colors = [];
+    for (let i = 0; i < 4; i++) {
+        colors.push(getComputedStyle(document.documentElement).getPropertyValue(`--color-${i}`).trim());
+    }
+
+    if (isPiPMode) {
+        // PiP 視窗直接更新樣式
+        for (let i = 0; i < 4; i++) {
+            statusWindow.document.documentElement.style.setProperty(`--color-${i}`, colors[i]);
+            const btn = statusWindow.document.getElementById('pip-btn' + i);
+            if (btn) {
+                btn.style.borderColor = colors[i];
+                if (i === selectedColor) btn.style.backgroundColor = colors[i];
+                else btn.style.backgroundColor = "transparent";
+            }
+        }
+    } else if (!statusWindow.closed) {
+        statusWindow.postMessage({ type: "COLOR_UPDATE", colors: colors }, "*");
+    }
+}
+
+// --- 長按 O/X 功能 ---
+let longPressTimer = null;
+let longPressActive = false;
+let currentLongPressIndex = -1;
+
+function handlePlatformMouseDown(e, index) {
+    if (typeof isObserver !== 'undefined' && isObserver) return;
+    if (e.button !== 0 || selectedColor === -1) return; // 僅限左鍵
+
+    longPressActive = false;
+    currentLongPressIndex = index;
+
+    // 綁定全域 mouseup 確保滑鼠移出格子也能正確放開
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+
+    longPressTimer = setTimeout(() => {
+        showOXPanel(e.clientX, e.clientY);
+        longPressActive = true;
+    }, 150); // 150ms 長按
+}
+
+function handleGlobalMouseUp(e) {
+    if (longPressTimer) clearTimeout(longPressTimer);
+    if (!longPressActive) return;
+
+    // 檢查滑鼠是否在 O 或 X 上
+    const oBtn = document.getElementById('ox-o');
+    const xBtn = document.getElementById('ox-x');
+    if (!oBtn || !xBtn) return;
+
+    const mouseX = e.clientX;
+    const mouseY = e.clientY;
+
+    const rectO = oBtn.getBoundingClientRect();
+    const rectX = xBtn.getBoundingClientRect();
+
+    // 稍微增加判定的 Padding (10px) 讓點選更容易
+    const p = 10;
+    if (mouseX >= rectO.left - p && mouseX <= rectO.right + p && mouseY >= rectO.top - p && mouseY <= rectO.bottom + p) {
+        handleOXSelection('O');
+    } else if (mouseX >= rectX.left - p && mouseX <= rectX.right + p && mouseY >= rectX.top - p && mouseY <= rectX.bottom + p) {
+        handleOXSelection('X');
+    }
+
+    hideOXPanel();
+    longPressActive = false;
+    window.removeEventListener('mouseup', handleGlobalMouseUp);
+}
+
+function handlePlatformMouseUp(e, index) {
+    // 這裡改由 handleGlobalMouseUp 處理
+    if (longPressTimer) clearTimeout(longPressTimer);
+}
+
+function handlePlatformMouseLeave(e, index) {
+    if (longPressTimer && !longPressActive) {
+        clearTimeout(longPressTimer);
+    }
+    // 長按成功後，隨便滑鼠移去哪面板都不消失，直到 mouseup
+}
+
+function showOXPanel(x, y) {
+    const panel = document.getElementById('ox-panel');
+    if (!panel) {
+        console.error("找不到 ox-panel 元素！");
+        return;
+    }
+    panel.style.display = 'block';
+    // 稍微向上位移，避免被手指或滑鼠擋住
+    panel.style.left = `${x - 75}px`;
+    panel.style.top = `${y - 120}px`;
+    console.log(`面版已顯示在: x=${x}, y=${y}`);
+}
+
+function hideOXPanel() {
+    document.getElementById('ox-panel').style.display = 'none';
+}
+
+async function handleOXSelection(type) {
+    if (currentLongPressIndex === -1 || selectedColor === -1) return;
+
+    if (type === 'O') {
+        // 直接輸入正解 (不受 X 模式影響)
+        // 暫時修改 isXMarkMode 以利用現有的 simulatePlatformClick
+        const oldX = isXMarkMode[selectedColor];
+        isXMarkMode[selectedColor] = false;
+        await simulatePlatformClick(currentLongPressIndex);
+        isXMarkMode[selectedColor] = oldX;
+    } else if (type === 'X') {
+        // 直接輸入 X (不受 X 模式影響)
+        const oldX = isXMarkMode[selectedColor];
+        isXMarkMode[selectedColor] = true;
+        await simulatePlatformClick(currentLongPressIndex);
+        isXMarkMode[selectedColor] = oldX;
+    }
+
+    currentLongPressIndex = -1;
+}
 
